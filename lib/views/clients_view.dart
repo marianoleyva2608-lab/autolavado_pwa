@@ -268,27 +268,57 @@ class _ClientsViewState extends State<ClientsView> {
     );
   }
 
+  Widget _buildBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(
           title: const Text(
             'Gestión de Clientes',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          elevation: 1,
-          bottom: const TabBar(
-            labelColor: Color(0xFF1E3A8A),
-            unselectedLabelColor: Colors.grey,
-            indicatorColor: Color(0xFF1E3A8A),
-            tabs: [
-              Tab(icon: Icon(Icons.receipt_long), text: 'FACTURACIÓN'),
-              Tab(icon: Icon(Icons.note_alt), text: 'SOLO NOTA'),
-            ],
+          foregroundColor: const Color(0xFF1E3A8A),
+          elevation: 0,
+          centerTitle: true,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(48),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+              ),
+              child: const TabBar(
+                labelColor: Color(0xFF1E3A8A),
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: Color(0xFF1E3A8A),
+                indicatorWeight: 3,
+                tabs: [
+                  Tab(text: 'FACTURACIÓN'),
+                  Tab(text: 'SOLO NOTA'),
+                ],
+              ),
+            ),
           ),
         ),
         body: _isLoading
@@ -305,7 +335,7 @@ class _ClientsViewState extends State<ClientsView> {
           icon: const Icon(Icons.add, color: Colors.white),
           label: const Text(
             'NUEVO CLIENTE',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
         ),
       ),
@@ -320,61 +350,100 @@ class _ClientsViewState extends State<ClientsView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.person_off, size: 64, color: Colors.grey[300]),
+            Icon(Icons.people_outline, size: 80, color: Colors.grey.shade300),
             const SizedBox(height: 16),
-            Text('No hay clientes en esta categoría',
-                style: TextStyle(color: Colors.grey[500])),
+            Text(
+              'No hay clientes en esta categoría',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 16),
+            ),
           ],
         ),
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         final c = filtered[index];
+        final bool isNote = type == 'NOTA';
+        
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          elevation: 1,
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 2,
+          shadowColor: Colors.black12,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey.withOpacity(0.1)),
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor:
-                  type == 'FACTURA' ? const Color(0xFF1E3A8A) : Colors.orange,
-              child: Icon(type == 'FACTURA' ? Icons.business : Icons.person,
-                  color: Colors.white),
-            ),
-            title: Text(
-              c['name'],
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (type == 'FACTURA')
-                  Text('RFC: ${c['rfc'] ?? 'N/A'} | Regimen: ${c['regimen_code']}')
-                else
-                  Text('Tel: ${c['phone'] ?? 'Sin teléfono'}'),
-                if (c['has_credit'] == true)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Text(
-                      'CRÉDITO: \$${c['credit_limit']}',
-                      style: const TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11),
-                    ),
-                  ),
-              ],
-            ),
-            trailing: IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () => _addOrEditClient(client: c),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (isNote ? Colors.orange : const Color(0xFF1E3A8A)).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isNote ? Icons.person_outline : Icons.business_outlined,
+                  color: isNote ? Colors.orange : const Color(0xFF1E3A8A),
+                ),
+              ),
+              title: Text(
+                c['name'].toString().toUpperCase(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   const SizedBox(height: 4),
+                   if (!isNote) ...[
+                     Text(
+                       'RFC: ${c['rfc']?.toString().isNotEmpty == true ? c['rfc'] : 'SIN RFC'}',
+                       style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                     ),
+                     Text(
+                       'Regimen: ${_currentRegimenes[c['regimen_code']] ?? c['regimen_code'] ?? 'N/A'}',
+                       style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                     ),
+                   ] else ...[
+                     Row(
+                       children: [
+                         const Icon(Icons.phone_android, size: 14, color: Colors.grey),
+                         const SizedBox(width: 4),
+                         Text(
+                           c['phone']?.toString().isNotEmpty == true ? c['phone'] : 'Sin teléfono',
+                           style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                         ),
+                       ],
+                     ),
+                   ],
+                   const SizedBox(height: 8),
+                   Row(
+                     children: [
+                       _buildBadge(isNote ? 'NOTA' : 'FACTURA', isNote ? Colors.orange : Colors.blue),
+                       if (c['has_credit'] == true) ...[
+                         const SizedBox(width: 8),
+                         _buildBadge('CON CRÉDITO (\$${c['credit_limit']})', Colors.green),
+                       ],
+                     ],
+                   ),
+                ],
+              ),
+              trailing: Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
+                  onPressed: () => _addOrEditClient(client: c),
+                ),
+              ),
             ),
           ),
         );
