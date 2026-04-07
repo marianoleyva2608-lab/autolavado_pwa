@@ -5,6 +5,8 @@ import 'washers_view.dart';
 import 'billing_view.dart';
 import 'clients_view.dart';
 import 'reports_view.dart';
+import 'payroll_view.dart';
+import 'catalog_view.dart';
 
 class AdminView extends StatefulWidget {
   const AdminView({super.key});
@@ -51,9 +53,15 @@ class _AdminViewState extends State<AdminView> {
                 ),
                 _SidebarItem(
                   icon: Icons.people_outline,
-                  title: 'Gestión de Lavadores',
+                  title: 'Equipo Lavadores',
                   isSelected: _selectedIndex == 2,
                   onTap: () => setState(() => _selectedIndex = 2),
+                ),
+                _SidebarItem(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Catálogo y Precios',
+                  isSelected: _selectedIndex == 5,
+                  onTap: () => setState(() => _selectedIndex = 5),
                 ),
                 _SidebarItem(
                   icon: Icons.people,
@@ -68,8 +76,8 @@ class _AdminViewState extends State<AdminView> {
                   onTap: () => setState(() => _selectedIndex = 4),
                 ),
                 _SidebarItem(
-                  icon: Icons.admin_panel_settings_outlined,
-                  title: 'Gestión de Administración',
+                  icon: Icons.payments_outlined,
+                  title: 'Nómina de Lavadores',
                   isSelected: _selectedIndex == 7,
                   onTap: () => setState(() => _selectedIndex = 7),
                 ),
@@ -103,7 +111,8 @@ class _AdminViewState extends State<AdminView> {
       case 2: return const WashersView();
       case 3: return const ClientsView();
       case 4: return const BillingView();
-      case 7: return const WashersView(); 
+      case 5: return const CatalogView();
+      case 7: return const PayrollView(); 
       default: return CajaView(onNavigate: (i) => setState(() => _selectedIndex = i));
     }
   }
@@ -327,10 +336,17 @@ class _CajaViewState extends State<CajaView> {
                 ),
                 const SizedBox(width: 16),
                 _QuickActionCard(
-                  title: 'ADMINISTRACIÓN',
-                  icon: Icons.admin_panel_settings,
-                  color: Colors.redAccent,
+                  title: 'NÓMINA',
+                  icon: Icons.payments,
+                  color: Colors.green,
                   onTap: () => widget.onNavigate!(7),
+                ),
+                const SizedBox(width: 16),
+                _QuickActionCard(
+                  title: 'PRECIOS / CATÁLOGO',
+                  icon: Icons.inventory_2,
+                  color: Colors.orange,
+                  onTap: () => widget.onNavigate!(5),
                 ),
               ],
             ),
@@ -411,7 +427,7 @@ class _CajaViewState extends State<CajaView> {
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))],
                         ),
                         child: Column(
                           children: [
@@ -524,7 +540,7 @@ class _CajaViewState extends State<CajaView> {
                 contentPadding: const EdgeInsets.all(16),
                 leading: Container(
                   width: 50, height: 50,
-                  decoration: BoxDecoration(color: inCart ? const Color(0xFF1E3A8A).withOpacity(0.1) : Colors.grey[100], borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(color: inCart ? const Color(0xFF1E3A8A).withValues(alpha: 0.1) : Colors.grey[100], borderRadius: BorderRadius.circular(12)),
                   child: Icon(Icons.directions_car, color: inCart ? const Color(0xFF1E3A8A) : Colors.grey[600]),
                 ),
                 title: Row(
@@ -575,7 +591,7 @@ class _CajaViewState extends State<CajaView> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.orange.withOpacity(0.3), width: 2),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.3), width: 2),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -666,13 +682,13 @@ class _TicketCardState extends State<_TicketCard> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                         child: Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: Colors.grey.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                         child: Text(entryDateTime, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold, fontSize: 11)),
                       ),
                       const SizedBox(width: 8),
@@ -767,7 +783,7 @@ class _ElapsedTimeDisplayState extends State<_ElapsedTimeDisplay> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: Colors.orange.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: [
           const Icon(Icons.timer, size: 14, color: Colors.deepOrange),
@@ -832,9 +848,9 @@ class _QuickActionCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
