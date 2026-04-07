@@ -15,6 +15,8 @@ class _ReceptionViewState extends State<ReceptionView> {
   String? _plate;
   String? _model;
   String? _color;
+  String? _customerName;
+  String? _customerPhone;
   String _paymentOption = 'postpago'; // 'prepago' o 'postpago'
   Map<String, dynamic>? _selectedService;
   String _vehicleType = 'AUTO';
@@ -118,6 +120,8 @@ class _ReceptionViewState extends State<ReceptionView> {
       
       // 1. Insert Ticket
       final ticketResponse = await _supabase.from('cw_tickets').insert({
+        'customer_name': _customerName,
+        'customer_phone': _customerPhone,
         'vehicle_plate': _plate ?? 'S/N',
         'vehicle_model': _model ?? 'Desconocido',
         'vehicle_color': _color ?? 'Desconocido',
@@ -204,51 +208,30 @@ class _ReceptionViewState extends State<ReceptionView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Datos del Vehículo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                      const Text('Datos del Cliente y Vehículo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
                       const SizedBox(height: 24),
-                      TextFormField(
-                        decoration: InputDecoration(
-                          labelText: 'Placas',
-                          hintText: 'JKM-1234',
-                          prefixIcon: const Icon(Icons.pin),
-                          filled: true,
-                          fillColor: Colors.blueGrey[50],
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        ),
-                        onSaved: (v) => _plate = v?.toUpperCase(),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField('Nombre del Cliente', Icons.person, (val) => _customerName = val),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField('Teléfono', Icons.phone, (val) => _customerPhone = val, isPhone: true),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
+                      _buildTextField('Placas', Icons.pin, (val) => _plate = val?.toUpperCase()),
+                      const SizedBox(height: 16),
+                      Row(
                         children: [
-                          SizedBox(
-                            width: 250,
-                            child: TextFormField(
-                              decoration: InputDecoration(
-                                labelText: 'Modelo / Marca',
-                                hintText: 'Honda CRV',
-                                prefixIcon: const Icon(Icons.directions_car),
-                                filled: true,
-                                fillColor: Colors.blueGrey[50],
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              ),
-                              validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
-                              onSaved: (v) => _model = v,
-                            ),
+                          Expanded(
+                            child: _buildTextField('Modelo / Marca', Icons.directions_car, (val) => _model = val),
                           ),
-                          SizedBox(
-                            width: 250,
-                            child: TextFormField(
-                              decoration: InputDecoration(
-                                labelText: 'Color',
-                                hintText: 'Plata',
-                                prefixIcon: const Icon(Icons.color_lens),
-                                filled: true,
-                                fillColor: Colors.blueGrey[50],
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              ),
-                              onSaved: (v) => _color = v,
-                            ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField('Color', Icons.palette, (val) => _color = val),
                           ),
                         ],
                       ),
@@ -284,7 +267,7 @@ class _ReceptionViewState extends State<ReceptionView> {
                       const SizedBox(height: 24),
                       DropdownButtonFormField<Map<String, dynamic>>(
                         isExpanded: true,
-                        initialValue: _selectedService,
+                        value: _selectedService,
                         decoration: InputDecoration(
                           labelText: 'Servicio / Paquete',
                           prefixIcon: const Icon(Icons.local_car_wash),
@@ -441,6 +424,19 @@ class _ReceptionViewState extends State<ReceptionView> {
               ),
             ),
           ),
+    );
+  }
+  Widget _buildTextField(String label, IconData icon, Function(String?) onSaved, {bool isPhone = false}) {
+    return TextFormField(
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        filled: true,
+        fillColor: Colors.grey[200],
+      ),
+      keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
+      onSaved: onSaved,
     );
   }
 }
