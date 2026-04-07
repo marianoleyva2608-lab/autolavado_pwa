@@ -48,6 +48,18 @@ class _AdminViewState extends State<AdminView> {
                   onTap: () => setState(() => _selectedIndex = 0),
                 ),
                 _SidebarItem(
+                  icon: Icons.receipt_long,
+                  title: 'Facturación CFDI',
+                  isSelected: _selectedIndex == 4,
+                  onTap: () => setState(() => _selectedIndex = 4),
+                ),
+                _SidebarItem(
+                  icon: Icons.payments_outlined,
+                  title: 'Nómina de Lavadores',
+                  isSelected: _selectedIndex == 7,
+                  onTap: () => setState(() => _selectedIndex = 7),
+                ),
+                _SidebarItem(
                   icon: Icons.history,
                   title: 'Historial / Ventas',
                   isSelected: _selectedIndex == 1,
@@ -70,18 +82,6 @@ class _AdminViewState extends State<AdminView> {
                   title: 'Clientes',
                   isSelected: _selectedIndex == 3,
                   onTap: () => setState(() => _selectedIndex = 3),
-                ),
-                _SidebarItem(
-                  icon: Icons.receipt_long,
-                  title: 'Facturación CFDI',
-                  isSelected: _selectedIndex == 4,
-                  onTap: () => setState(() => _selectedIndex = 4),
-                ),
-                _SidebarItem(
-                  icon: Icons.payments_outlined,
-                  title: 'Nómina de Lavadores',
-                  isSelected: _selectedIndex == 7,
-                  onTap: () => setState(() => _selectedIndex = 7),
                 ),
                 const Spacer(),
                 const Divider(color: Colors.white24),
