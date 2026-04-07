@@ -49,11 +49,19 @@ class _PayrollViewState extends State<PayrollView> {
 
       // 3. Fetch Ledger transactions
       final transactionsRes = await _supabase.from('cw_worker_ledger')
-          .select()
+          .select('*, cw_tickets(cw_ticket_items(quantity, cw_services(name)))')
           .gte('created_at', start)
           .lte('created_at', end);
-      
       final transactions = List<Map<String, dynamic>>.from(transactionsRes);
+
+      // 4. Fetch Global Balances for everything (Debt)
+      final allLedger = await _supabase.from('cw_worker_ledger').select('worker_id, amount');
+      Map<String, double> globalBalances = {};
+      for (var b in allLedger) {
+        final wId = b['worker_id'] as String;
+        final amt = (b['amount'] as num?)?.toDouble() ?? 0.0;
+        globalBalances[wId] = (globalBalances[wId] ?? 0.0) + amt;
+      }
 
       // 4. Process data
       List<Map<String, dynamic>> processed = [];
@@ -103,10 +111,22 @@ class _PayrollViewState extends State<PayrollView> {
         for (var tr in workerTrans) {
           final amt = (tr['amount'] as num?)?.toDouble() ?? 0.0;
           final type = tr['type'];
-          if (type == 'loan') totalLoans += amt;
-          else if (type == 'tip') totalTips += amt;
-          else if (type == 'purchase') totalStore += amt;
-          else if (type == 'bonus') totalBonus += amt;
+
+          if (type == 'purchase' && tr['cw_tickets'] != null) {
+            try {
+              final items = tr['cw_tickets']['cw_ticket_items'] as List;
+              if (items.isNotEmpty) {
+                final detail = items.map((i) => "${i['quantity']}x ${i['cw_services']['name']}").join(", ");
+                tr['description'] = "Tienda: $detail";
+              }
+            } catch (e) {}
+          }
+
+          // Usamos valores absolutos para las variables de visualización
+          if (type == 'loan') totalLoans += amt.abs();
+          else if (type == 'tip') totalTips += amt.abs();
+          else if (type == 'purchase') totalStore += amt.abs();
+          else if (type == 'bonus') totalBonus += amt.abs();
         }
 
         double netToPay = totalCommission + totalTips + totalBonus - totalLoans - totalStore;
@@ -124,6 +144,7 @@ class _PayrollViewState extends State<PayrollView> {
           'to_pay': netToPay,
           'tickets': ticketDetails,
           'transactions': workerTrans,
+          'global_balance': globalBalances[w['id']] ?? 0.0,
         });
       }
 
@@ -157,7 +178,7 @@ class _PayrollViewState extends State<PayrollView> {
               pw.SizedBox(height: 20),
               pw.TableHelper.fromTextArray(
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                headers: ['LAVADOR', 'AUTOS', 'COMIS.', 'PROP./BONO', 'PREST.', 'TIENDA', 'TOTAL'],
+                headers: ['LAVADOR', 'AUTOS', 'COMIS.', 'PROP./BONO', 'PREST.', 'TIENDA', 'TOTAL', 'DEUDA TOT.'],
                 data: _payrollData.map((w) => [
                   w['worker_name'],
                   w['car_count'],
@@ -166,6 +187,7 @@ class _PayrollViewState extends State<PayrollView> {
                   '\$${w['total_loans'].toStringAsFixed(0)}',
                   '\$${w['total_store'].toStringAsFixed(0)}',
                   '\$${w['to_pay'].toStringAsFixed(2)}',
+                  '\$${(w['global_balance'] as double).toStringAsFixed(2)}',
                 ]).toList(),
               ),
               pw.SizedBox(height: 20),
@@ -220,7 +242,7 @@ class _PayrollViewState extends State<PayrollView> {
                   DateFormat('dd/MM').format(DateTime.parse(tr['created_at'])),
                   tr['type'].toString().toUpperCase(),
                   tr['description'] ?? '-',
-                  '${(tr['type'] == 'loan' || tr['type'] == 'purchase') ? '-' : '+'}\$${tr['amount']}',
+                  '${(tr['type'] == 'loan' || tr['type'] == 'purchase') ? '-' : '+'}\$${(tr['amount'] as num).abs().toStringAsFixed(0)}',
                 ]).toList(),
               ),
               
@@ -239,10 +261,14 @@ class _PayrollViewState extends State<PayrollView> {
                     pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                       pw.Text('Total Deducciones:'), pw.Text('-\$${(w['total_loans'] + w['total_store']).toStringAsFixed(2)}')
                     ]),
-                    pw.Divider(),
                     pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                      pw.Text('TOTAL NETO A PAGAR:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)), 
+                      pw.Text('TOTAL NETO A PAGAR EN LA SEMANA:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)), 
                       pw.Text('\$${w['to_pay'].toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14))
+                    ]),
+                    pw.SizedBox(height: 5),
+                    pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                      pw.Text('Saldo Histórico (Deuda Total Restante):', style: pw.TextStyle(color: PdfColors.grey700)), 
+                      pw.Text('\$${(w['global_balance'] as double).toStringAsFixed(2)}', style: pw.TextStyle(color: w['global_balance'] < 0 ? PdfColors.red : PdfColors.green))
                     ]),
                   ],
                 ),
@@ -498,6 +524,14 @@ class _PayrollViewState extends State<PayrollView> {
                       );
                     }),
                     if ((w['transactions'] as List).isEmpty) const Text('Sin ajustes en el periodo', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Saldo Histórico (Deuda Total):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text('\$${(w['global_balance'] as double).toStringAsFixed(2)}', style: TextStyle(color: w['global_balance'] < 0 ? Colors.red : Colors.green, fontWeight: FontWeight.bold, fontSize: 14)),
+                      ],
+                    ),
                   ],
                 ),
               ),

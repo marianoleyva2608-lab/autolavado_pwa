@@ -154,8 +154,9 @@ class _StoreViewState extends State<StoreView> {
         await _supabase.from('cw_worker_ledger').insert({
           'worker_id': selectedWorkerId,
           'type': 'purchase',
-          'amount': -totalAmount, // Monto negativo porque es un descuento/deuda
+          'amount': -totalAmount,
           'description': 'Compra en tiendita (Vale)',
+          'ticket_id': ticketId, // Guardamos el link al ticket para ver el detalle después
           'created_at': DateTime.now().toIso8601String(),
         });
       }
