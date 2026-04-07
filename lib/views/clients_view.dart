@@ -16,6 +16,7 @@ class _ClientsViewState extends State<ClientsView> {
   final _nameController = TextEditingController();
   final _rfcController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   String _selectedRegimen = "612";
   String _selectedPersonType = "FÍSICA";
   String _selectedClientType = "FACTURA";
@@ -70,9 +71,10 @@ class _ClientsViewState extends State<ClientsView> {
 
   Future<void> _addOrEditClient({Map<String, dynamic>? client}) async {
     if (client != null) {
-      _nameController.text = client['name'];
-      _rfcController.text = client['rfc'];
+      _nameController.text = client['name'] ?? '';
+      _rfcController.text = client['rfc'] ?? '';
       _emailController.text = client['email'] ?? '';
+      _phoneController.text = client['phone'] ?? '';
       _selectedPersonType = client['person_type'] ?? 'FÍSICA';
       _selectedRegimen =
           client['regimen_code'] ??
@@ -84,6 +86,7 @@ class _ClientsViewState extends State<ClientsView> {
       _nameController.clear();
       _rfcController.clear();
       _emailController.clear();
+      _phoneController.clear();
       _selectedPersonType = "FÍSICA";
       _selectedRegimen = "612";
       _selectedClientType = "FACTURA";
@@ -100,81 +103,6 @@ class _ClientsViewState extends State<ClientsView> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre o Razón Social',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedPersonType,
-                  decoration: const InputDecoration(
-                    labelText: 'TIPO DE PERSONA',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'FÍSICA',
-                      child: Text('Persona Física (RFC 13 carac.)'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'MORAL',
-                      child: Text('Persona Moral (RFC 12 carac.)'),
-                    ),
-                  ],
-                  onChanged: (val) {
-                    setDialogState(() {
-                      _selectedPersonType = val!;
-                      _selectedRegimen = _selectedPersonType == "FÍSICA"
-                          ? "612"
-                          : "601";
-                    });
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _rfcController,
-                  maxLength: _selectedPersonType == "FÍSICA" ? 13 : 12,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: InputDecoration(
-                    labelText: 'RFC',
-                    hintText: _selectedPersonType == "FÍSICA"
-                        ? 'ABCD123456XYZ'
-                        : 'ABC123456XYZ',
-                  ),
-                  onChanged: (val) => setDialogState(() {}),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Correo electrónico',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedRegimen,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Régimen Fiscal',
-                  ),
-                  items: _currentRegimenes.entries
-                      .map(
-                        (e) => DropdownMenuItem(
-                          value: e.key,
-                          child: Text(
-                            e.value,
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (val) =>
-                      setDialogState(() => _selectedRegimen = val!),
-                ),
-                const SizedBox(height: 12),
-                const Divider(),
-                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: _selectedClientType,
                   decoration: const InputDecoration(
@@ -187,6 +115,91 @@ class _ClientsViewState extends State<ClientsView> {
                   ],
                   onChanged: (val) => setDialogState(() => _selectedClientType = val!),
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre o Razón Social',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Teléfono',
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (_selectedClientType == 'FACTURA') ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedPersonType,
+                    decoration: const InputDecoration(
+                      labelText: 'TIPO DE PERSONA',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'FÍSICA',
+                        child: Text('Persona Física (RFC 13 carac.)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'MORAL',
+                        child: Text('Persona Moral (RFC 12 carac.)'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      setDialogState(() {
+                        _selectedPersonType = val!;
+                        _selectedRegimen = _selectedPersonType == "FÍSICA"
+                            ? "612"
+                            : "601";
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _rfcController,
+                    maxLength: _selectedPersonType == "FÍSICA" ? 13 : 12,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      labelText: 'RFC',
+                      hintText: _selectedPersonType == "FÍSICA"
+                          ? 'ABCD123456XYZ'
+                          : 'ABC123456XYZ',
+                    ),
+                    onChanged: (val) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Correo electrónico',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedRegimen,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Régimen Fiscal',
+                    ),
+                    items: _currentRegimenes.entries
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e.key,
+                            child: Text(
+                              e.value,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (val) =>
+                        setDialogState(() => _selectedRegimen = val!),
+                  ),
+                ],
+                const Divider(),
                 const SizedBox(height: 12),
                 SwitchListTile(
                   title: const Text('Habilitar Crédito'),
@@ -219,11 +232,12 @@ class _ClientsViewState extends State<ClientsView> {
               ),
               onPressed: () async {
                 final clientData = {
-                  'name': _nameController.text,
-                  'rfc': _rfcController.text.toUpperCase().trim(),
-                  'email': _emailController.text,
-                  'regimen_code': _selectedRegimen,
-                  'person_type': _selectedPersonType,
+                  'name': _nameController.text.trim(),
+                  'phone': _phoneController.text.trim(),
+                  'rfc': _selectedClientType == 'FACTURA' ? _rfcController.text.toUpperCase().trim() : null,
+                  'email': _selectedClientType == 'FACTURA' ? _emailController.text.trim() : null,
+                  'regimen_code': _selectedClientType == 'FACTURA' ? _selectedRegimen : null,
+                  'person_type': _selectedClientType == 'FACTURA' ? _selectedPersonType : null,
                   'client_type': _selectedClientType,
                   'has_credit': _hasCredit,
                   'credit_limit': double.tryParse(_creditLimitController.text) ?? 0.0,
@@ -256,103 +270,115 @@ class _ClientsViewState extends State<ClientsView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Gestión de Clientes',
-          style: TextStyle(fontWeight: FontWeight.bold),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Gestión de Clientes',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 1,
+          bottom: const TabBar(
+            labelColor: Color(0xFF1E3A8A),
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: Color(0xFF1E3A8A),
+            tabs: [
+              Tab(icon: Icon(Icons.receipt_long), text: 'FACTURACIÓN'),
+              Tab(icon: Icon(Icons.note_alt), text: 'SOLO NOTA'),
+            ],
+          ),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 1,
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                children: [
+                  _buildClientList('FACTURA'),
+                  _buildClientList('NOTA'),
+                ],
+              ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _addOrEditClient(),
+          backgroundColor: const Color(0xFF1E3A8A),
+          icon: const Icon(Icons.add, color: Colors.white),
+          label: const Text(
+            'NUEVO CLIENTE',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(24),
-              itemCount: _clients.length,
-              itemBuilder: (context, index) {
-                final c = _clients[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Color(0xFF1E3A8A),
-                      child: Icon(Icons.person, color: Colors.white),
-                    ),
-                    title: Text(
-                      c['name'],
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'RFC: ${c['rfc'] ?? 'N/A'} | ${(c['person_type'] == "MORAL" ? _regimenesMoral : _regimenesFisica)[c['regimen_code']] ?? c['regimen_code']}',
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: c['client_type'] == 'FACTURA' ? Colors.blue[50] : Colors.orange[50],
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: c['client_type'] == 'FACTURA' ? Colors.blue[200]! : Colors.orange[200]!),
-                              ),
-                              child: Text(
-                                c['client_type'] ?? 'FACTURA',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: c['client_type'] == 'FACTURA' ? Colors.blue[700] : Colors.orange[700],
-                                ),
-                              ),
-                            ),
-                            if (c['has_credit'] == true) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.green[50],
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: Colors.green[200]!),
-                                ),
-                                child: Text(
-                                  'CÓN CRÉDITO (\$${c['credit_limit']})',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green[700],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: () => _addOrEditClient(client: c),
-                    ),
-                  ),
-                );
-              },
+    );
+  }
+
+  Widget _buildClientList(String type) {
+    final filtered = _clients.where((c) => (c['client_type'] ?? 'FACTURA') == type).toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.person_off, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text('No hay clientes en esta categoría',
+                style: TextStyle(color: Colors.grey[500])),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(24),
+      itemCount: filtered.length,
+      itemBuilder: (context, index) {
+        final c = filtered[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.withOpacity(0.1)),
+          ),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor:
+                  type == 'FACTURA' ? const Color(0xFF1E3A8A) : Colors.orange,
+              child: Icon(type == 'FACTURA' ? Icons.business : Icons.person,
+                  color: Colors.white),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addOrEditClient(),
-        backgroundColor: const Color(0xFF1E3A8A),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'NUEVO CLIENTE',
-          style: TextStyle(color: Colors.white),
-        ),
-      ),
+            title: Text(
+              c['name'],
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (type == 'FACTURA')
+                  Text('RFC: ${c['rfc'] ?? 'N/A'} | Regimen: ${c['regimen_code']}')
+                else
+                  Text('Tel: ${c['phone'] ?? 'Sin teléfono'}'),
+                if (c['has_credit'] == true)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(
+                      'CRÉDITO: \$${c['credit_limit']}',
+                      style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11),
+                    ),
+                  ),
+              ],
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blue),
+              onPressed: () => _addOrEditClient(client: c),
+            ),
+          ),
+        );
+      },
     );
   }
 }
