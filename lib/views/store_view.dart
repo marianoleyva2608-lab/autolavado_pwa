@@ -11,6 +11,7 @@ class StoreView extends StatefulWidget {
 class _StoreViewState extends State<StoreView> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _workers = [];
   Map<String, int> _cart = {}; // ID -> quantity
   bool _isLoading = true;
   bool _isSubmitting = false;
@@ -19,6 +20,18 @@ class _StoreViewState extends State<StoreView> {
   void initState() {
     super.initState();
     _fetchProducts();
+    _fetchWorkers();
+  }
+
+  Future<void> _fetchWorkers() async {
+    try {
+      final response = await _supabase
+          .from('cw_workers')
+          .select()
+          .eq('is_active', true)
+          .order('name');
+      setState(() => _workers = List<Map<String, dynamic>>.from(response));
+    } catch (_) {}
   }
 
   Future<void> _fetchProducts() async {
@@ -53,17 +66,70 @@ class _StoreViewState extends State<StoreView> {
 
   Future<void> _checkout() async {
     if (_cart.isEmpty) return;
+
+    // 1. Mostrar diálogo de método de pago
+    final String? method = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Seleccionar Método de Pago'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.money_off, color: Colors.green),
+              title: const Text('Pago en Efectivo / Pagado'),
+              onTap: () => Navigator.pop(context, 'cash'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_outline, color: Colors.blue),
+              title: const Text('Crédito Lavador (Vale de Nómina)'),
+              onTap: () => Navigator.pop(context, 'worker'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (method == null) return;
+
+    String? selectedWorkerId;
+    String? selectedWorkerName;
+
+    if (method == 'worker') {
+      final Map<String, dynamic>? worker = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Seleccionar Lavador'),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _workers.length,
+              itemBuilder: (context, i) => ListTile(
+                title: Text(_workers[i]['name']),
+                onTap: () => Navigator.pop(context, _workers[i]),
+              ),
+            ),
+          ),
+        ),
+      );
+      if (worker == null) return;
+      selectedWorkerId = worker['id'];
+      selectedWorkerName = worker['name'];
+    }
     
     setState(() => _isSubmitting = true);
     
     try {
+      final totalAmount = _total;
+      
       // 1. Create a "Tienda" ticket
       final ticketResponse = await _supabase.from('cw_tickets').insert({
-        'customer_name': 'Venta Directa',
+        'customer_name': method == 'cash' ? 'Venta Directa' : 'Vale: $selectedWorkerName',
         'vehicle_plate': 'TIENDA',
         'status': 'delivered',
         'payment_status': 'paid',
-        'total_amount': _total,
+        'total_amount': totalAmount,
         'completed_at': DateTime.now().toIso8601String(),
       }).select().single();
 
@@ -83,9 +149,25 @@ class _StoreViewState extends State<StoreView> {
 
       await _supabase.from('cw_ticket_items').insert(items);
 
+      // 3. Si es Vale de Lavador, registrar en el Ledger (Deducción)
+      if (method == 'worker' && selectedWorkerId != null) {
+        await _supabase.from('cw_worker_ledger').insert({
+          'worker_id': selectedWorkerId,
+          'type': 'tiendita',
+          'amount': -totalAmount, // Monto negativo porque es un descuento/deuda
+          'description': 'Compra en tiendita (Vale)',
+          'date': DateTime.now().toIso8601String(),
+        });
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Venta completada con éxito')),
+          SnackBar(
+            content: Text(method == 'cash' 
+              ? 'Venta en efectivo completada' 
+              : 'Vale registrado para $selectedWorkerName'),
+            backgroundColor: Colors.green
+          ),
         );
         setState(() {
           _cart = {};
@@ -96,7 +178,7 @@ class _StoreViewState extends State<StoreView> {
       print('Error in checkout: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al procesar venta: $e')),
+          SnackBar(content: Text('Error al procesar venta: $e'), backgroundColor: Colors.red),
         );
         setState(() => _isSubmitting = false);
       }
