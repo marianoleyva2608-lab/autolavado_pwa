@@ -415,17 +415,54 @@ class _ReceptionViewState extends State<ReceptionView> {
         if (textEditingValue.text.length < 2) return const Iterable.empty();
         
         try {
-          final res = await _supabase
+          // 1. Consultar en la tabla de clientes (prioridad)
+          final clientsRes = await _supabase
+              .from('cw_clients')
+              .select('name, phone, rfc')
+              .ilike('name', '%${textEditingValue.text}%')
+              .limit(3);
+          
+          // 2. Consultar en tickets anteriores (pero filtrando "Vales" y nombres de trabajadores)
+          final ticketsRes = await _supabase
               .from('cw_tickets')
               .select('customer_name, customer_phone, vehicle_plate, vehicle_model, vehicle_color, vehicle_type')
               .ilike(fieldName, '%${textEditingValue.text}%')
+              .not('customer_name', 'ilike', 'Vale:%')
               .limit(5);
+
+          // 3. Consultar nombres de trabajadores para excluirlos si es necesario
+          final workersRes = await _supabase
+              .from('cw_workers')
+              .select('name');
+          final workerNames = (workersRes as List).map((w) => w['name'].toString().toUpperCase()).toSet();
+
+          List<Map<String, dynamic>> items = [];
           
-          final List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(res);
-          // Eliminar duplicados básicos por el campo que estamos buscando
+          // Agregar resultados de catálogos de clientes
+          for (var c in clientsRes) {
+            items.add({
+              'customer_name': c['name'],
+              'customer_phone': c['phone'] ?? '',
+              'vehicle_plate': '',
+              'vehicle_model': '',
+              'vehicle_color': '',
+              'vehicle_type': 'AUTO'
+            });
+          }
+
+          // Agregar resultados de tickets filtrados
+          for (var t in ticketsRes) {
+            final name = t['customer_name']?.toString().toUpperCase() ?? '';
+            if (!workerNames.contains(name)) {
+              items.add(Map<String, dynamic>.from(t));
+            }
+          }
+          
+          // Eliminar duplicados por el campo de búsqueda
           final seen = <String>{};
           return items.where((i) => seen.add(i[fieldName].toString().toUpperCase())).toList();
         } catch (e) {
+          print('Error en autocomplete: $e');
           return const Iterable.empty();
         }
       },
