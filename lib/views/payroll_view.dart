@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 
 class PayrollView extends StatefulWidget {
   const PayrollView({super.key});
@@ -12,12 +13,11 @@ class _PayrollViewState extends State<PayrollView> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
   List<Map<String, dynamic>> _payrollData = [];
-
-  // Date filter
   DateTimeRange _dateRange = DateTimeRange(
     start: DateTime.now().subtract(const Duration(days: 7)),
-    end: DateTime.now(),
+    end: DateTime.now().add(const Duration(days: 1)),
   );
+  bool _showTable = false;
 
   @override
   void initState() {
@@ -28,80 +28,54 @@ class _PayrollViewState extends State<PayrollView> {
   Future<void> _fetchPayroll() async {
     setState(() => _isLoading = true);
     try {
-      // 1. Fetch all workers
-      final workersRes = await _supabase
-          .from('cw_workers')
-          .select()
-          .eq('role', 'washer')
-          .eq('is_active', true);
+      final start = _dateRange.start.toUtc().toIso8601String();
+      final end = _dateRange.end.toUtc().toIso8601String();
+
+      // 1. Fetch Workers
+      final workersRes = await _supabase.from('cw_workers').select('id, name').eq('role', 'washer');
       final workers = List<Map<String, dynamic>>.from(workersRes);
 
-      // 2. Fetch all paid tickets in date range WITH their items and service names
-      final ticketsRes = await _supabase
-          .from('cw_tickets')
-          .select(
-            '*, cw_ticket_items(service_id, cw_services(name, comm_auto, comm_suv_ch, comm_suv_m, comm_g, comm_xl))',
-          )
-          .eq('status', 'delivered')
-          .eq('payment_status', 'paid')
-          .gte('created_at', _dateRange.start.toUtc().toIso8601String())
-          .lte(
-            'created_at',
-            _dateRange.end
-                .add(const Duration(days: 1))
-                .toUtc()
-                .toIso8601String(),
-          );
-
+      // 2. Fetch Tickets with items in range
+      final ticketsRes = await _supabase.from('cw_tickets')
+          .select('*, cw_ticket_items(*, cw_services(*))')
+          .gte('created_at', start)
+          .lte('created_at', end)
+          .eq('status', 'delivered');
+      
       final tickets = List<Map<String, dynamic>>.from(ticketsRes);
 
-      // 3. Fetch all worker transactions (loans, tips, items, etc)
-      final transactionsRes = await _supabase
-          .from('cw_worker_ledger')
+      // 3. Fetch Ledger transactions
+      final transactionsRes = await _supabase.from('cw_worker_ledger')
           .select()
-          .gte('created_at', _dateRange.start.toUtc().toIso8601String())
-          .lte(
-            'created_at',
-            _dateRange.end
-                .add(const Duration(days: 1))
-                .toUtc()
-                .toIso8601String(),
-          );
+          .gte('created_at', start)
+          .lte('created_at', end);
+      
       final transactions = List<Map<String, dynamic>>.from(transactionsRes);
 
       // 4. Process data
       List<Map<String, dynamic>> processed = [];
       for (var w in workers) {
-        final workerTickets = tickets
-            .where((t) => t['worker_assigned_id'] == w['id'])
-            .toList();
+        final workerTickets = tickets.where((t) => t['worker_assigned_id'] == w['id']).toList();
         double totalRevenue = 0;
         double totalCommission = 0;
 
         List<Map<String, dynamic>> ticketDetails = [];
         for (var t in workerTickets) {
           totalRevenue += (t['total_amount'] as num?)?.toDouble() ?? 0.0;
-
           String serviceName = 'Desconocido';
           double ticketCommissionValue = 0;
 
-          if (t['cw_ticket_items'] != null &&
-              (t['cw_ticket_items'] as List).isNotEmpty) {
+          if (t['cw_ticket_items'] != null && (t['cw_ticket_items'] as List).isNotEmpty) {
             final firstItem = t['cw_ticket_items'][0];
             final svc = firstItem['cw_services'];
             serviceName = svc['name'] ?? 'Servicio';
 
             final vType = t['vehicle_type'] ?? 'AUTO';
             String commKey = 'comm_auto';
-            if (vType == 'SUV CH') {
-              commKey = 'comm_suv_ch';
-            } else if (vType == 'SUV M') {
-              commKey = 'comm_suv_m';
-            } else if (vType == 'G') {
-              commKey = 'comm_g';
-            } else if (vType == 'XL') {
-              commKey = 'comm_xl';
-            }
+            if (vType == 'SUV CH') commKey = 'comm_suv_ch';
+            else if (vType == 'SUV M') commKey = 'comm_suv_m';
+            else if (vType == 'G') commKey = 'comm_g';
+            else if (vType == 'XL') commKey = 'comm_xl';
 
             ticketCommissionValue = (svc[commKey] as num?)?.toDouble() ?? 0.0;
           }
@@ -117,7 +91,6 @@ class _PayrollViewState extends State<PayrollView> {
           totalCommission += ticketCommissionValue;
         }
 
-        // Add transactions (loans, tips, etc)
         final workerTrans = transactions.where((tr) => tr['worker_id'] == w['id']).toList();
         double totalLoans = 0;
         double totalTips = 0;
@@ -158,7 +131,6 @@ class _PayrollViewState extends State<PayrollView> {
         });
       }
     } catch (e) {
-      print('Error fetching payroll: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
         setState(() => _isLoading = false);
@@ -240,6 +212,11 @@ class _PayrollViewState extends State<PayrollView> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
+            icon: Icon(_showTable ? Icons.list : Icons.table_chart),
+            tooltip: _showTable ? 'Vista de Tarjetas' : 'Vista de Tabla Semanal',
+            onPressed: () => setState(() => _showTable = !_showTable),
+          ),
+          IconButton(
             icon: const Icon(Icons.date_range),
             onPressed: () async {
               final picked = await showDateRangePicker(
@@ -254,124 +231,138 @@ class _PayrollViewState extends State<PayrollView> {
               }
             },
           ),
-          const SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            color: Colors.white,
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, color: Color(0xFF1E3A8A)),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Cálculo de comisiones fijas + ajustes (propinas, préstamos, tiendita).',
-                    style: TextStyle(fontWeight: FontWeight.w500, color: Colors.blueGrey),
-                  ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                color: Colors.white,
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Periodo: ${DateFormat('dd MMM').format(_dateRange.start)} al ${DateFormat('dd MMM yyyy').format(_dateRange.end)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    Text('Total General a Pagar: \$${_calculateGrandTotal().toStringAsFixed(2)}', style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold, fontSize: 16)),
+                  ],
                 ),
-                Text(
-                  '${_dateRange.start.day}/${_dateRange.start.month} - ${_dateRange.end.day}/${_dateRange.end.month}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
-                ),
+              ),
+              Expanded(
+                child: _showTable ? _buildSummaryTable() : _buildCardsList(),
+              ),
+            ],
+          ),
+    );
+  }
+
+  double _calculateGrandTotal() {
+    return _payrollData.fold(0, (sum, item) => sum + item['to_pay']);
+  }
+
+  Widget _buildSummaryTable() {
+    if (_payrollData.isEmpty) return const Center(child: Text('No hay datos para este periodo'));
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Card(
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(const Color(0xFF1E3A8A).withValues(alpha: 0.1)),
+              columns: const [
+                DataColumn(label: Text('LAVADOR')),
+                DataColumn(label: Text('AUTOS')),
+                DataColumn(label: Text('COMISIÓN \$')),
+                DataColumn(label: Text('PROPINAS \$')),
+                DataColumn(label: Text('PRESTAMOS \$')),
+                DataColumn(label: Text('TIENDITA \$')),
+                DataColumn(label: Text('TOTAL A PAGAR', style: TextStyle(fontWeight: FontWeight.bold))),
               ],
+              rows: _payrollData.map((w) => DataRow(cells: [
+                DataCell(Text(w['worker_name'], style: const TextStyle(fontWeight: FontWeight.bold))),
+                DataCell(Text(w['car_count'].toString())),
+                DataCell(Text('\$${w['total_commission'].toStringAsFixed(0)}')),
+                DataCell(Text('\$${(w['total_tips'] + w['total_bonus']).toStringAsFixed(0)}', style: const TextStyle(color: Colors.green))),
+                DataCell(Text('\$${w['total_loans'].toStringAsFixed(0)}', style: const TextStyle(color: Colors.red))),
+                DataCell(Text('\$${w['total_store'].toStringAsFixed(0)}', style: const TextStyle(color: Colors.red))),
+                DataCell(Text('\$${w['to_pay'].toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo))),
+              ])).toList(),
             ),
           ),
-          _isLoading
-              ? const Expanded(child: Center(child: CircularProgressIndicator()))
-              : Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _payrollData.length,
-                    itemBuilder: (context, index) {
-                      final p = _payrollData[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        child: ExpansionTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.blue[50],
-                            child: const Icon(Icons.person, color: Color(0xFF1E3A8A)),
-                          ),
-                          title: Text(p['worker_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                          subtitle: Text(
-                            '\$${p['total_commission'].toStringAsFixed(0)} com. | \$${p['total_tips'].toStringAsFixed(0)} prop. | -\$${(p['total_loans'] + p['total_store']).toStringAsFixed(0)} deduc.',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '\$${p['to_pay'].toStringAsFixed(2)}',
-                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green),
-                                  ),
-                                  const Text('A PAGAR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-                                ],
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
-                                onPressed: () => _showAddAdjustmentDialog(p['worker_id'], p['worker_name']),
-                              ),
-                            ],
-                          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardsList() {
+    if (_payrollData.isEmpty) return const Center(child: Text('No hay registros en este periodo'));
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _payrollData.length,
+      itemBuilder: (context, i) {
+        final w = _payrollData[i];
+        return Card(
+          elevation: 2,
+          margin: const EdgeInsets.only(bottom: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: ExpansionTile(
+            title: Text(w['worker_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            subtitle: Text('Autos: ${w['car_count']}  |  Total a Pagar: \$${w['to_pay'].toStringAsFixed(2)}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600)),
+            trailing: IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: Colors.indigo),
+              onPressed: () => _showAddAdjustmentDialog(w['worker_id'], w['worker_name']),
+            ),
+            children: [
+              const Divider(),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Desglose de Servicios:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                    const SizedBox(height: 8),
+                    ... (w['tickets'] as List).map((t) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${t['plate']} - ${t['service']} (${t['type']})', style: const TextStyle(fontSize: 13)),
+                          Text('\$${t['comm'].toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    )),
+                    const SizedBox(height: 16),
+                    const Text('Ajustes y Tiendita:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                    const SizedBox(height: 8),
+                    ... (w['transactions'] as List).map((tr) {
+                      final type = tr['type'];
+                      final isDeduction = type == 'loan' || type == 'purchase';
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Divider(),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              child: Row(
-                                children: [
-                                  Expanded(flex: 2, child: Text('Detalle / Servicio', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                                  Expanded(child: Text('Tipo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                                  Text('Monto', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                            // List services as additions
-                            ...((p['tickets'] as List).map((t) {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                child: Row(
-                                  children: [
-                                    Expanded(flex: 2, child: Text(t['service'], style: const TextStyle(fontSize: 12))),
-                                    Expanded(child: Text(t['type'], style: const TextStyle(fontSize: 12, color: Colors.blueGrey))),
-                                    Text('+\$${t['comm']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
-                                  ],
-                                ),
-                              );
-                            }).toList()),
-                            // List Ledger items (loans, tips, items)
-                            ...((p['transactions'] as List).map((tr) {
-                              final isCredit = tr['type'] == 'tip' || tr['type'] == 'bonus';
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                child: Row(
-                                  children: [
-                                    Expanded(flex: 2, child: Text(tr['description'] ?? tr['type'], style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic))),
-                                    Expanded(child: Text(tr['type'].toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
-                                    Text(
-                                      '${isCredit ? "+" : "-"}\$${tr['amount']}',
-                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isCredit ? Colors.green : Colors.red),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList()),
-                            const SizedBox(height: 16),
+                            Text('${tr['description'] ?? type.toString().toUpperCase()} (${DateFormat('dd/MM').format(DateTime.parse(tr['created_at']))})', style: const TextStyle(fontSize: 13)),
+                            Text('${isDeduction ? '-' : '+'}\$${tr['amount']}', style: TextStyle(color: isDeduction ? Colors.red : Colors.green, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       );
-                    },
-                  ),
+                    }),
+                    if ((w['transactions'] as List).isEmpty) const Text('Sin ajustes en el periodo', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
                 ),
-        ],
-      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
