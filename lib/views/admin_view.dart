@@ -237,6 +237,62 @@ class _CajaViewState extends State<CajaView> {
     setState(() => _cart.removeAt(index));
   }
 
+  Widget _buildStatusBadge(String status) {
+    String label = status.toUpperCase();
+    Color color = Colors.grey;
+    switch (status.toLowerCase()) {
+      case 'queue':
+        label = 'EN ESPERA';
+        color = Colors.orange;
+        break;
+      case 'washing':
+        label = 'LAVANDO';
+        color = Colors.blue;
+        break;
+      case 'ready':
+        label = 'LISTO';
+        color = Colors.green;
+        break;
+      case 'delivered':
+        label = 'ENTREGADO';
+        color = Colors.grey;
+        break;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
+      ),
+    );
+  }
+
+  Widget _buildElapsedTime(String startTime) {
+    final start = DateTime.parse(startTime).toLocal();
+    final diff = DateTime.now().difference(start);
+    final minutes = diff.inMinutes;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: Colors.grey.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.timer_outlined, size: 14, color: Colors.blueGrey),
+          const SizedBox(width: 4),
+          Text(
+            '$minutes min',
+            style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _processCart() async {
     if (_cart.isEmpty) return;
     setState(() => _isProcessing = true);
@@ -461,11 +517,43 @@ class _CajaViewState extends State<CajaView> {
             final isInCart = _cart.any((c) => c['type'] == 'vehicle' && c['item']['id'] == t['id']);
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.grey.shade200),
+              ),
               child: ListTile(
-                leading: const Icon(Icons.drive_eta, color: Colors.blueAccent),
-                title: Text('${t['vehicle_plate']} - ${t['vehicle_model']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('Estado: ${t['status'].toString().toUpperCase()}'),
-                trailing: Text('\$${t['total_amount']}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.drive_eta, color: Colors.blueAccent),
+                ),
+                title: Text(
+                  '${t['vehicle_plate']} - ${t['vehicle_model']}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      _buildStatusBadge(t['status']),
+                      const SizedBox(width: 8),
+                      _buildElapsedTime(t['created_at']),
+                    ],
+                  ),
+                ),
+                trailing: Text(
+                  '\$${t['total_amount']}',
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
                 onTap: isInCart ? null : () => _addToCart('vehicle', t),
                 enabled: !isInCart,
               ),

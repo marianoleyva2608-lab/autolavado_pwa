@@ -133,6 +133,7 @@ class _ReceptionViewState extends State<ReceptionView> {
         if (existing.isNotEmpty) {
           final lastPlate = existing.first['vehicle_plate'].toString().toUpperCase();
           if (lastPlate != plates) {
+             if (!mounted) return;
              final bool? proceed = await showDialog<bool>(
                context: context,
                builder: (context) => AlertDialog(
@@ -265,7 +266,6 @@ class _ReceptionViewState extends State<ReceptionView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Datos del Vehículo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
                       const Text('Datos del Cliente y Vehículo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
                       const SizedBox(height: 24),
                       Row(
@@ -369,122 +369,21 @@ class _ReceptionViewState extends State<ReceptionView> {
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                         ),
                       ),
-                      
-                      const SizedBox(height: 32),
-                      const Text('¿Desea agregar Snacks o Bebidas?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: _snacks.isEmpty 
-                          ? const Center(child: Padding(
-                              padding: EdgeInsets.all(20),
-                              child: Text('No hay snacks registrados', style: TextStyle(color: Colors.grey)),
-                            ))
-                          : GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          childAspectRatio: 0.8,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                        itemCount: _snacks.length,
-                        itemBuilder: (context, index) {
-                          final snack = _snacks[index];
-                          final qty = _selectedSnacks[snack['id']] ?? 0;
-                          final imageUrl = snack['image_url'];
-                          
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: qty > 0 ? Colors.orange : Colors.grey[200]!, width: 2),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(4.0),
-                                    child: imageUrl != null && imageUrl.toString().isNotEmpty
-                                      ? Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(Icons.fastfood, size: 20, color: Colors.orange))
-                                      : const Icon(Icons.fastfood, size: 20, color: Colors.orange),
-                                  ),
-                                ),
-                                Text(snack['name'], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                Text('\$${snack['price_auto'] ?? snack['price']}', style: const TextStyle(fontSize: 10, color: Colors.orange)),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.remove_circle, size: 18, color: Colors.orange),
-                                      onPressed: qty > 0 ? () => setState(() => _selectedSnacks[snack['id']] = qty - 1) : null,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      icon: const Icon(Icons.add_circle, size: 18, color: Colors.orange),
-                                      onPressed: () => setState(() => _selectedSnacks[snack['id']] = qty + 1),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                      ),
-                      
-                      const SizedBox(height: 32),
-                      const Text('Método de Pago', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: RadioListTile<String>(
-                              title: const Text('Postpago'),
-                              subtitle: const Text('Paga al salir'),
-                              value: 'postpago',
-                              groupValue: _paymentOption,
-                              onChanged: (val) => setState(() => _paymentOption = val!),
-                              activeColor: const Color(0xFF1E3A8A),
-                            ),
-                          ),
-                          Expanded(
-                            child: RadioListTile<String>(
-                              title: const Text('Prepago'),
-                              subtitle: const Text('Pagado ya'),
-                              value: 'prepago',
-                              groupValue: _paymentOption,
-                              onChanged: (val) => setState(() => _paymentOption = val!),
-                              activeColor: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 48),
+                              const SizedBox(height: 32),
                       SizedBox(
                         width: double.infinity,
-                        height: 70,
+                        height: 60,
                         child: ElevatedButton(
                           onPressed: _isSubmitting ? null : _submitTicket,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E3A8A),
+                            backgroundColor: const Color(0xFFE53935),
+                            foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            elevation: 0,
                           ),
-                          child: _isSubmitting
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text('REGISTRAR EN COLA', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                          child: _isSubmitting 
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text('REGISTRAR ENTRADA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],

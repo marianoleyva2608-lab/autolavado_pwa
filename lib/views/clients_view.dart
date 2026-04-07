@@ -12,6 +12,7 @@ class _ClientsViewState extends State<ClientsView> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
   List<Map<String, dynamic>> _clients = [];
+  String _searchQuery = "";
 
   final _nameController = TextEditingController();
   final _rfcController = TextEditingController();
@@ -59,13 +60,33 @@ class _ClientsViewState extends State<ClientsView> {
   Future<void> _fetchClients() async {
     try {
       final res = await _supabase.from('cw_clients').select().order('name');
-      setState(() {
-        _clients = List<Map<String, dynamic>>.from(res);
-        _isLoading = false;
-      });
+      
+      // Obtener todos los tickets para contar vehículos únicos por cliente
+      final ticketsRes = await _supabase.from('cw_tickets').select('customer_name, vehicle_plate');
+      
+      // Mapa para contar vehículos únicos (placas) por nombre de cliente normalizado
+      Map<String, Set<String>> clientVehicles = {};
+      for (var t in ticketsRes) {
+        final rawName = t['customer_name']?.toString().toUpperCase().trim() ?? '';
+        final plate = t['vehicle_plate']?.toString().toUpperCase().trim() ?? '';
+        if (rawName.isNotEmpty && plate.isNotEmpty) {
+          clientVehicles.putIfAbsent(rawName, () => {}).add(plate);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _clients = List<Map<String, dynamic>>.from(res).map((c) {
+            final name = (c['name'] ?? '').toString().toUpperCase().trim();
+            c['vehicle_count'] = clientVehicles[name]?.length ?? 0;
+            return c;
+          }).toList();
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      print('Error fetching clients: $e');
-      setState(() => _isLoading = false);
+      print('Error en _fetchClients: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -294,9 +315,15 @@ class _ClientsViewState extends State<ClientsView> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(
-          title: const Text(
-            'Gestión de Clientes',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          title: TextField(
+            onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
+            decoration: InputDecoration(
+              hintText: 'Buscar cliente...',
+              hintStyle: TextStyle(color: Colors.grey.shade400),
+              prefixIcon: const Icon(Icons.search, color: Color(0xFF1E3A8A)),
+              border: InputBorder.none,
+            ),
           ),
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF1E3A8A),
@@ -343,7 +370,11 @@ class _ClientsViewState extends State<ClientsView> {
   }
 
   Widget _buildClientList(String type) {
-    final filtered = _clients.where((c) => (c['client_type'] ?? 'FACTURA') == type).toList();
+    final filtered = _clients.where((c) {
+      final matchesType = (c['client_type'] ?? 'FACTURA') == type;
+      final matchesSearch = c['name'].toString().toLowerCase().contains(_searchQuery);
+      return matchesType && matchesSearch;
+    }).toList();
 
     if (filtered.isEmpty) {
       return Center(
@@ -426,12 +457,14 @@ class _ClientsViewState extends State<ClientsView> {
                    Row(
                      children: [
                        _buildBadge(isNote ? 'NOTA' : 'FACTURA', isNote ? Colors.orange : Colors.blue),
-                       if (c['has_credit'] == true) ...[
-                         const SizedBox(width: 8),
-                         _buildBadge('CON CRÉDITO (\$${c['credit_limit']})', Colors.green),
-                       ],
-                     ],
-                   ),
+                        if (c['has_credit'] == true) ...[
+                          const SizedBox(width: 8),
+                          _buildBadge('CON CRÉDITO (\$${c['credit_limit']})', Colors.green),
+                        ],
+                        const SizedBox(width: 8),
+                        _buildBadge('${c['vehicle_count'] ?? 0} VEHÍCULOS', Colors.purple),
+                      ],
+                    ),
                 ],
               ),
               trailing: Container(
