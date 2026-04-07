@@ -12,15 +12,16 @@ class _ReceptionViewState extends State<ReceptionView> {
   final _supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
 
-  String? _plate;
-  String? _model;
-  String? _color;
-  String? _customerName;
-  String? _customerPhone;
+  final TextEditingController _customerNameController = TextEditingController();
+  final TextEditingController _customerPhoneController = TextEditingController();
+  final TextEditingController _plateController = TextEditingController();
+  final TextEditingController _modelController = TextEditingController();
+  final TextEditingController _colorController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
+  
   String _paymentOption = 'postpago'; // 'prepago' o 'postpago'
   Map<String, dynamic>? _selectedService;
   String _vehicleType = 'AUTO';
-  final TextEditingController _priceController = TextEditingController();
   
   List<Map<String, dynamic>> _services = [];
   List<Map<String, dynamic>> _snacks = [];
@@ -34,6 +35,17 @@ class _ReceptionViewState extends State<ReceptionView> {
   void initState() {
     super.initState();
     _fetchServices();
+  }
+
+  @override
+  void dispose() {
+    _customerNameController.dispose();
+    _customerPhoneController.dispose();
+    _plateController.dispose();
+    _modelController.dispose();
+    _colorController.dispose();
+    _priceController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchServices() async {
@@ -120,11 +132,11 @@ class _ReceptionViewState extends State<ReceptionView> {
       
       // 1. Insert Ticket
       final ticketResponse = await _supabase.from('cw_tickets').insert({
-        'customer_name': _customerName,
-        'customer_phone': _customerPhone,
-        'vehicle_plate': _plate ?? 'S/N',
-        'vehicle_model': _model ?? 'Desconocido',
-        'vehicle_color': _color ?? 'Desconocido',
+        'customer_name': _customerNameController.text.trim(),
+        'customer_phone': _customerPhoneController.text.trim(),
+        'vehicle_plate': _plateController.text.trim().toUpperCase(),
+        'vehicle_model': _modelController.text.trim(),
+        'vehicle_color': _colorController.text.trim(),
         'vehicle_type': _vehicleType,
         'status': 'queue',
         'payment_status': paymentStatus,
@@ -162,6 +174,11 @@ class _ReceptionViewState extends State<ReceptionView> {
           const SnackBar(content: Text('🚗 Registro completado con éxito.'), backgroundColor: Colors.green),
         );
         _formKey.currentState!.reset();
+        _customerNameController.clear();
+        _customerPhoneController.clear();
+        _plateController.clear();
+        _modelController.clear();
+        _colorController.clear();
         setState(() {
           _paymentOption = 'postpago';
           _selectedSnacks = {};
@@ -213,25 +230,36 @@ class _ReceptionViewState extends State<ReceptionView> {
                       Row(
                         children: [
                           Expanded(
-                            child: _buildTextField('Nombre del Cliente', Icons.person, (val) => _customerName = val),
+                            child: _buildAutocompleteField(
+                              'Nombre del Cliente', 
+                              Icons.person, 
+                              _customerNameController,
+                              'customer_name'
+                            ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildTextField('Teléfono', Icons.phone, (val) => _customerPhone = val, isPhone: true),
+                            child: _buildTextField('Teléfono', Icons.phone, _customerPhoneController, isPhone: true),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      _buildTextField('Placas', Icons.pin, (val) => _plate = val?.toUpperCase()),
+                      _buildAutocompleteField(
+                        'Placas', 
+                        Icons.pin, 
+                        _plateController,
+                        'vehicle_plate',
+                        onSelected: (val) => _plateController.text = val.toUpperCase(),
+                      ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
                           Expanded(
-                            child: _buildTextField('Modelo / Marca', Icons.directions_car, (val) => _model = val),
+                            child: _buildTextField('Modelo / Marca', Icons.directions_car, _modelController),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildTextField('Color', Icons.palette, (val) => _color = val),
+                            child: _buildTextField('Color', Icons.palette, _colorController),
                           ),
                         ],
                       ),
@@ -426,8 +454,9 @@ class _ReceptionViewState extends State<ReceptionView> {
           ),
     );
   }
-  Widget _buildTextField(String label, IconData icon, Function(String?) onSaved, {bool isPhone = false}) {
+  Widget _buildTextField(String label, IconData icon, TextEditingController controller, {bool isPhone = false}) {
     return TextFormField(
+      controller: controller,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon),
@@ -436,7 +465,65 @@ class _ReceptionViewState extends State<ReceptionView> {
         fillColor: Colors.grey[200],
       ),
       keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
-      onSaved: onSaved,
+    );
+  }
+
+  Widget _buildAutocompleteField(String label, IconData icon, TextEditingController controller, String fieldName, {Function(String)? onSelected}) {
+    return Autocomplete<Map<String, dynamic>>(
+      displayStringForOption: (option) => option[fieldName] ?? '',
+      optionsBuilder: (TextEditingValue textEditingValue) async {
+        if (textEditingValue.text.length < 2) return const Iterable.empty();
+        
+        try {
+          final res = await _supabase
+              .from('cw_tickets')
+              .select('customer_name, customer_phone, vehicle_plate, vehicle_model, vehicle_color, vehicle_type')
+              .ilike(fieldName, '%${textEditingValue.text}%')
+              .limit(5);
+          
+          final List<Map<String, dynamic>> items = List<Map<String, dynamic>>.from(res);
+          // Eliminar duplicados básicos por el campo que estamos buscando
+          final seen = <String>{};
+          return items.where((i) => seen.add(i[fieldName].toString().toUpperCase())).toList();
+        } catch (e) {
+          return const Iterable.empty();
+        }
+      },
+      onSelected: (Map<String, dynamic> selection) {
+        setState(() {
+          _customerNameController.text = selection['customer_name'] ?? '';
+          _customerPhoneController.text = selection['customer_phone'] ?? '';
+          _plateController.text = selection['vehicle_plate'] ?? '';
+          _modelController.text = selection['vehicle_model'] ?? '';
+          _colorController.text = selection['vehicle_color'] ?? '';
+          
+          if (selection['vehicle_type'] != null) {
+            _vehicleType = selection['vehicle_type'];
+            _updatePrice();
+          }
+        });
+        if (onSelected != null) onSelected(selection[fieldName]);
+      },
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        // Sincronizar el controlador del Autocomplete con el de nuestra clase
+        textController.text = controller.text;
+        textController.addListener(() {
+          controller.text = textController.text;
+        });
+
+        return TextFormField(
+          controller: textController,
+          focusNode: focusNode,
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            filled: true,
+            fillColor: Colors.grey[200],
+          ),
+          onFieldSubmitted: (v) => onFieldSubmitted(),
+        );
+      },
     );
   }
 }
