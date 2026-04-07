@@ -156,7 +156,7 @@ class _StoreViewState extends State<StoreView> {
           'type': 'tiendita',
           'amount': -totalAmount, // Monto negativo porque es un descuento/deuda
           'description': 'Compra en tiendita (Vale)',
-          'date': DateTime.now().toIso8601String(),
+          'created_at': DateTime.now().toIso8601String(),
         });
       }
 
