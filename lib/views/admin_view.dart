@@ -7,6 +7,7 @@ import 'clients_view.dart';
 import 'reports_view.dart';
 import 'payroll_view.dart';
 import 'catalog_view.dart';
+import 'weekly_invoicing_view.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
@@ -58,6 +59,12 @@ class _AdminViewState extends State<AdminView> {
                   title: 'Nómina de Lavadores',
                   isSelected: _selectedIndex == 7,
                   onTap: () => setState(() => _selectedIndex = 7),
+                ),
+                _SidebarItem(
+                  icon: Icons.calendar_view_week,
+                  title: 'Reportes Semanales',
+                  isSelected: _selectedIndex == 8,
+                  onTap: () => setState(() => _selectedIndex = 8),
                 ),
                 _SidebarItem(
                   icon: Icons.history,
@@ -136,6 +143,7 @@ class _AdminViewState extends State<AdminView> {
       case 4: return const BillingView();
       case 5: return const CatalogView();
       case 7: return const PayrollView(); 
+      case 8: return const WeeklyInvoicingView();
       default: return CajaView(onNavigate: (i) => setState(() => _selectedIndex = i));
     }
   }
@@ -293,12 +301,50 @@ class _CajaViewState extends State<CajaView> {
     );
   }
 
+  Future<Map<String, dynamic>?> _checkClientCredit(List<dynamic> vehiclesInCart) async {
+    if (vehiclesInCart.isEmpty) return null;
+    final firstVehicle = vehiclesInCart.first['item'];
+    final name = firstVehicle['customer_name']?.toString() ?? '';
+    if (name.isEmpty) return null;
+
+    final res = await _supabase.from('cw_clients').select().eq('name', name).maybeSingle();
+    if (res != null && res['has_credit'] == true) {
+      return res;
+    }
+    return null;
+  }
+
   Future<void> _processCart() async {
     if (_cart.isEmpty) return;
     setState(() => _isProcessing = true);
     try {
       final vehicles = _cart.where((c) => c['type'] == 'vehicle').toList();
       final snacks = _cart.where((c) => c['type'] == 'snack').toList();
+
+      // Check for credit if a vehicle is involved
+      String paymentStatus = 'paid';
+      final clientCredit = await _checkClientCredit(vehicles);
+      if (clientCredit != null) {
+        final useCredit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Cliente con Crédito Detectado'),
+            content: Text('${clientCredit['name']} tiene línea de crédito activa.\n¿Desea mandar esta venta a CRÉDITO o cobrar en EFECTIVO/TARJETA?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('COBRAR AHORA')),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true), 
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                child: const Text('MANDAR A CRÉDITO')
+              ),
+            ],
+          )
+        );
+        if (useCredit == true) {
+          paymentStatus = 'credit';
+        }
+      }
+
       String? billingTicketId;
 
       if (vehicles.isEmpty && snacks.isNotEmpty) {
@@ -333,7 +379,7 @@ class _CajaViewState extends State<CajaView> {
           billingTicketId ??= t['id'];
           final isReady = t['status'] == 'ready';
           await _supabase.from('cw_tickets').update({
-            'payment_status': 'paid',
+            'payment_status': paymentStatus,
             if (isReady) 'status': 'delivered',
             if (isReady) 'completed_at': DateTime.now().toUtc().toIso8601String(),
             'requires_invoice': _requiresInvoice && i == 0,
