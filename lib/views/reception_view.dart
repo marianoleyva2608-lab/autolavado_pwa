@@ -118,6 +118,47 @@ class _ReceptionViewState extends State<ReceptionView> {
     setState(() => _isSubmitting = true);
 
     try {
+      // Validar si el cliente ya tiene otra placa registrada
+      final name = _customerNameController.text.trim();
+      final plates = _plateController.text.trim().toUpperCase();
+      
+      if (name.isNotEmpty) {
+        final existing = await _supabase
+            .from('cw_tickets')
+            .select('vehicle_plate, vehicle_model')
+            .eq('customer_name', name)
+            .order('created_at', ascending: false)
+            .limit(1);
+            
+        if (existing.isNotEmpty) {
+          final lastPlate = existing.first['vehicle_plate'].toString().toUpperCase();
+          if (lastPlate != plates) {
+             final bool? proceed = await showDialog<bool>(
+               context: context,
+               builder: (context) => AlertDialog(
+                 title: const Text('¿Vehículo Nuevo?'),
+                 content: Text('El cliente "$name" tiene registrada la placa "$lastPlate" (${existing.first['vehicle_model']}).\n\n¿Deseas registrar este como un NUEVO vehículo para este cliente?'),
+                 actions: [
+                   TextButton(
+                     onPressed: () => Navigator.pop(context, false),
+                     child: const Text('CANCELAR / CORREGIR'),
+                   ),
+                   ElevatedButton(
+                     onPressed: () => Navigator.pop(context, true),
+                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E3A8A)),
+                     child: const Text('SÍ, ES NUEVO REGISTRO'),
+                   ),
+                 ],
+               ),
+             );
+             if (proceed != true) {
+               setState(() => _isSubmitting = false);
+               return;
+             }
+          }
+        }
+      }
+
       final paymentStatus = _paymentOption == 'prepago' ? 'paid' : 'pending';
       final basePrice = double.tryParse(_priceController.text) ?? 0.0;
       
