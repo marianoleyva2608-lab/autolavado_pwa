@@ -51,7 +51,12 @@ class _ReceptionViewState extends State<ReceptionView> {
           _snacks = all.where((s) => s['category'] == 'tiendita').toList();
           
           if (_services.isNotEmpty) {
-            _selectedService = _services.first;
+            // Buscar Paquete 1 para que sea la opción por defecto en "Primer Plano"
+            final pkg1 = _services.firstWhere(
+              (s) => s['name']?.toString().toUpperCase().contains('PAQUETE 1') ?? false,
+              orElse: () => _services.first,
+            );
+            _selectedService = pkg1;
             _updatePrice();
           }
           _isLoading = false;
