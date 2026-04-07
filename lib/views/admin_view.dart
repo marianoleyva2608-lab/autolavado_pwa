@@ -329,34 +329,6 @@ class _CajaViewState extends State<CajaView> {
           foregroundColor: const Color(0xFF1E3A8A),
           elevation: 0,
         ),
-        if (widget.onNavigate != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(32, 16, 32, 0),
-            child: Row(
-              children: [
-                _QuickActionCard(
-                  title: 'FACTURACIÓN CFDI',
-                  icon: Icons.receipt_long,
-                  color: Colors.indigo,
-                  onTap: () => widget.onNavigate!(4),
-                ),
-                const SizedBox(width: 16),
-                _QuickActionCard(
-                  title: 'NÓMINA',
-                  icon: Icons.payments,
-                  color: Colors.green,
-                  onTap: () => widget.onNavigate!(7),
-                ),
-                const SizedBox(width: 16),
-                _QuickActionCard(
-                  title: 'PRECIOS / CATÁLOGO',
-                  icon: Icons.inventory_2,
-                  color: Colors.orange,
-                  onTap: () => widget.onNavigate!(5),
-                ),
-              ],
-            ),
-          ),
         Expanded(
           child: DefaultTabController(
             length: 2,
@@ -532,31 +504,3 @@ class _CajaViewState extends State<CajaView> {
   }
 }
 
-class _QuickActionCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({required this.title, required this.icon, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
-          child: Row(
-            children: [
-              Icon(icon, color: Colors.white, size: 32),
-              const SizedBox(width: 16),
-              Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
