@@ -153,7 +153,7 @@ class _StoreViewState extends State<StoreView> {
       if (method == 'worker' && selectedWorkerId != null) {
         await _supabase.from('cw_worker_ledger').insert({
           'worker_id': selectedWorkerId,
-          'type': 'tiendita',
+          'type': 'purchase',
           'amount': -totalAmount, // Monto negativo porque es un descuento/deuda
           'description': 'Compra en tiendita (Vale)',
           'created_at': DateTime.now().toIso8601String(),
