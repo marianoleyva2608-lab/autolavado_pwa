@@ -18,6 +18,9 @@ class _ClientsViewState extends State<ClientsView> {
   final _emailController = TextEditingController();
   String _selectedRegimen = "612";
   String _selectedPersonType = "FÍSICA";
+  String _selectedClientType = "FACTURA";
+  bool _hasCredit = false;
+  final _creditLimitController = TextEditingController();
 
   final Map<String, String> _regimenesFisica = {
     "605": "605 - Sueldos y salarios",
@@ -74,12 +77,18 @@ class _ClientsViewState extends State<ClientsView> {
       _selectedRegimen =
           client['regimen_code'] ??
           (_selectedPersonType == 'FÍSICA' ? '612' : '601');
+      _selectedClientType = client['client_type'] ?? 'FACTURA';
+      _hasCredit = client['has_credit'] ?? false;
+      _creditLimitController.text = (client['credit_limit'] ?? 0.0).toString();
     } else {
       _nameController.clear();
       _rfcController.clear();
       _emailController.clear();
       _selectedPersonType = "FÍSICA";
       _selectedRegimen = "612";
+      _selectedClientType = "FACTURA";
+      _hasCredit = false;
+      _creditLimitController.text = "0.0";
     }
 
     showDialog(
@@ -163,6 +172,38 @@ class _ClientsViewState extends State<ClientsView> {
                   onChanged: (val) =>
                       setDialogState(() => _selectedRegimen = val!),
                 ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedClientType,
+                  decoration: const InputDecoration(
+                    labelText: 'TIPO DE CLIENTE',
+                    prefixIcon: Icon(Icons.category),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'FACTURA', child: Text('FACTURACIÓN (Oficial)')),
+                    DropdownMenuItem(value: 'NOTA', child: Text('SOLO NOTA (Interno)')),
+                  ],
+                  onChanged: (val) => setDialogState(() => _selectedClientType = val!),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  title: const Text('Habilitar Crédito'),
+                  subtitle: const Text('Permitir compras a cuenta'),
+                  value: _hasCredit,
+                  onChanged: (val) => setDialogState(() => _hasCredit = val),
+                  activeColor: Colors.blueAccent,
+                ),
+                if (_hasCredit)
+                  TextField(
+                    controller: _creditLimitController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Límite de Crédito',
+                      prefixIcon: Icon(Icons.account_balance_wallet),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -183,6 +224,9 @@ class _ClientsViewState extends State<ClientsView> {
                   'email': _emailController.text,
                   'regimen_code': _selectedRegimen,
                   'person_type': _selectedPersonType,
+                  'client_type': _selectedClientType,
+                  'has_credit': _hasCredit,
+                  'credit_limit': double.tryParse(_creditLimitController.text) ?? 0.0,
                 };
 
                 try {
@@ -244,8 +288,53 @@ class _ClientsViewState extends State<ClientsView> {
                       c['name'],
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: Text(
-                      'RFC: ${c['rfc']} | ${(c['person_type'] == "MORAL" ? _regimenesMoral : _regimenesFisica)[c['regimen_code']] ?? c['regimen_code']}',
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'RFC: ${c['rfc'] ?? 'N/A'} | ${(c['person_type'] == "MORAL" ? _regimenesMoral : _regimenesFisica)[c['regimen_code']] ?? c['regimen_code']}',
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: c['client_type'] == 'FACTURA' ? Colors.blue[50] : Colors.orange[50],
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: c['client_type'] == 'FACTURA' ? Colors.blue[200]! : Colors.orange[200]!),
+                              ),
+                              child: Text(
+                                c['client_type'] ?? 'FACTURA',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: c['client_type'] == 'FACTURA' ? Colors.blue[700] : Colors.orange[700],
+                                ),
+                              ),
+                            ),
+                            if (c['has_credit'] == true) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[50],
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Colors.green[200]!),
+                                ),
+                                child: Text(
+                                  'CÓN CRÉDITO (\$${c['credit_limit']})',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green[700],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
                     trailing: IconButton(
                       icon: const Icon(Icons.edit, color: Colors.blue),

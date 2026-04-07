@@ -182,7 +182,6 @@ class CajaView extends StatefulWidget {
 
 class _CajaViewState extends State<CajaView> {
   final _supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> _workers = [];
   List<Map<String, dynamic>> _snacks = [];
   final List<Map<String, dynamic>> _cart = [];
   bool _requiresInvoice = false;
@@ -195,11 +194,9 @@ class _CajaViewState extends State<CajaView> {
   }
 
   Future<void> _fetchData() async {
-    final wRes = await _supabase.from('cw_workers').select('id, name').eq('role', 'washer');
     final sRes = await _supabase.from('cw_services').select().eq('category', 'tiendita').eq('is_active', true);
     if (mounted) {
       setState(() {
-        _workers = List<Map<String, dynamic>>.from(wRes);
         _snacks = List<Map<String, dynamic>>.from(sRes);
       });
     }
