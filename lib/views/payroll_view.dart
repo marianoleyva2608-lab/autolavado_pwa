@@ -19,8 +19,6 @@ class _PayrollViewState extends State<PayrollView> {
     end: DateTime.now(),
   );
 
-  double _globalCommissionPercent = 30.0; // Default 30%
-
   @override
   void initState() {
     super.initState();
@@ -57,7 +55,21 @@ class _PayrollViewState extends State<PayrollView> {
 
       final tickets = List<Map<String, dynamic>>.from(ticketsRes);
 
-      // 3. Process data
+      // 3. Fetch all worker transactions (loans, tips, items, etc)
+      final transactionsRes = await _supabase
+          .from('cw_worker_ledger')
+          .select()
+          .gte('created_at', _dateRange.start.toUtc().toIso8601String())
+          .lte(
+            'created_at',
+            _dateRange.end
+                .add(const Duration(days: 1))
+                .toUtc()
+                .toIso8601String(),
+          );
+      final transactions = List<Map<String, dynamic>>.from(transactionsRes);
+
+      // 4. Process data
       List<Map<String, dynamic>> processed = [];
       for (var w in workers) {
         final workerTickets = tickets
@@ -70,7 +82,6 @@ class _PayrollViewState extends State<PayrollView> {
         for (var t in workerTickets) {
           totalRevenue += (t['total_amount'] as num?)?.toDouble() ?? 0.0;
 
-          // Extraer nombre del servicio y calcular comisión específica
           String serviceName = 'Desconocido';
           double ticketCommissionValue = 0;
 
@@ -80,17 +91,17 @@ class _PayrollViewState extends State<PayrollView> {
             final svc = firstItem['cw_services'];
             serviceName = svc['name'] ?? 'Servicio';
 
-            // Determinar comisión basado en el tipo de vehículo
             final vType = t['vehicle_type'] ?? 'AUTO';
             String commKey = 'comm_auto';
             if (vType == 'SUV CH') {
               commKey = 'comm_suv_ch';
-            } else if (vType == 'SUV M')
+            } else if (vType == 'SUV M') {
               commKey = 'comm_suv_m';
-            else if (vType == 'G')
+            } else if (vType == 'G') {
               commKey = 'comm_g';
-            else if (vType == 'XL')
+            } else if (vType == 'XL') {
               commKey = 'comm_xl';
+            }
 
             ticketCommissionValue = (svc[commKey] as num?)?.toDouble() ?? 0.0;
           }
@@ -106,13 +117,37 @@ class _PayrollViewState extends State<PayrollView> {
           totalCommission += ticketCommissionValue;
         }
 
+        // Add transactions (loans, tips, etc)
+        final workerTrans = transactions.where((tr) => tr['worker_id'] == w['id']).toList();
+        double totalLoans = 0;
+        double totalTips = 0;
+        double totalStore = 0;
+        double totalBonus = 0;
+
+        for (var tr in workerTrans) {
+          final amt = (tr['amount'] as num?)?.toDouble() ?? 0.0;
+          final type = tr['type'];
+          if (type == 'loan') totalLoans += amt;
+          else if (type == 'tip') totalTips += amt;
+          else if (type == 'purchase') totalStore += amt;
+          else if (type == 'bonus') totalBonus += amt;
+        }
+
+        double netToPay = totalCommission + totalTips + totalBonus - totalLoans - totalStore;
+
         processed.add({
           'worker_id': w['id'],
           'worker_name': w['name'],
           'car_count': workerTickets.length,
           'total_revenue': totalRevenue,
-          'to_pay': totalCommission,
+          'total_commission': totalCommission,
+          'total_loans': totalLoans,
+          'total_tips': totalTips,
+          'total_store': totalStore,
+          'total_bonus': totalBonus,
+          'to_pay': netToPay,
           'tickets': ticketDetails,
+          'transactions': workerTrans,
         });
       }
 
@@ -125,12 +160,74 @@ class _PayrollViewState extends State<PayrollView> {
     } catch (e) {
       print('Error fetching payroll: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _showAddAdjustmentDialog(String workerId, String workerName) async {
+    final amountController = TextEditingController();
+    final descController = TextEditingController();
+    String type = 'loan';
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Nuevo Ajuste: $workerName'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButton<String>(
+                value: type,
+                isExpanded: true,
+                items: const [
+                   DropdownMenuItem(value: 'loan', child: Text('Préstamo (Deducción)')),
+                   DropdownMenuItem(value: 'purchase', child: Text('Tiendita (Deducción)')),
+                   DropdownMenuItem(value: 'tip', child: Text('Propina (Extra)')),
+                   DropdownMenuItem(value: 'bonus', child: Text('Bono (Extra)')),
+                ],
+                onChanged: (val) => setDialogState(() => type = val!),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Monto \$', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descController,
+                decoration: const InputDecoration(labelText: 'Motivo / Descripción', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: () async {
+                final amt = double.tryParse(amountController.text);
+                if (amt == null) return;
+                
+                await _supabase.from('cw_worker_ledger').insert({
+                  'worker_id': workerId,
+                  'amount': amt,
+                  'type': type,
+                  'description': descController.text,
+                });
+                
+                if (mounted) {
+                  Navigator.pop(context);
+                  _fetchPayroll();
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -138,10 +235,7 @@ class _PayrollViewState extends State<PayrollView> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text(
-          'Nómina - Detalle por Lavador',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Nómina - Detalle por Lavador', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF1E3A8A),
         foregroundColor: Colors.white,
         actions: [
@@ -165,63 +259,28 @@ class _PayrollViewState extends State<PayrollView> {
       ),
       body: Column(
         children: [
-          // Header / Global Commission
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             color: Colors.white,
             child: Row(
               children: [
-                const Icon(Icons.percent, color: Color(0xFF1E3A8A)),
+                const Icon(Icons.info_outline, color: Color(0xFF1E3A8A)),
                 const SizedBox(width: 12),
-                const Text(
-                  'Comisión %:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(width: 16),
-                SizedBox(
-                  width: 80,
-                  child: TextField(
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                    onChanged: (val) {
-                      final p = double.tryParse(val);
-                      if (p != null) {
-                        setState(() {
-                          _globalCommissionPercent = p;
-                          for (var item in _payrollData) {
-                            item['commission_percent'] = p;
-                            item['to_pay'] = item['total_revenue'] * (p / 100);
-                          }
-                        });
-                      }
-                    },
-                    controller: TextEditingController(
-                      text: _globalCommissionPercent.toStringAsFixed(0),
-                    ),
+                const Expanded(
+                  child: Text(
+                    'Cálculo de comisiones fijas + ajustes (propinas, préstamos, tiendita).',
+                    style: TextStyle(fontWeight: FontWeight.w500, color: Colors.blueGrey),
                   ),
                 ),
-                const Spacer(),
                 Text(
-                  'Del ${_dateRange.start.day}/${_dateRange.start.month} al ${_dateRange.end.day}/${_dateRange.end.month}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.blueGrey,
-                  ),
+                  '${_dateRange.start.day}/${_dateRange.start.month} - ${_dateRange.end.day}/${_dateRange.end.month}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
                 ),
               ],
             ),
           ),
-
           _isLoading
-              ? const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                )
+              ? const Expanded(child: Center(child: CircularProgressIndicator()))
               : Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
@@ -230,133 +289,75 @@ class _PayrollViewState extends State<PayrollView> {
                       final p = _payrollData[index];
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         child: ExpansionTile(
                           leading: CircleAvatar(
                             backgroundColor: Colors.blue[50],
-                            child: const Icon(
-                              Icons.person,
-                              color: Color(0xFF1E3A8A),
-                            ),
+                            child: const Icon(Icons.person, color: Color(0xFF1E3A8A)),
                           ),
-                          title: Text(
-                            p['worker_name'],
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
+                          title: Text(p['worker_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                           subtitle: Text(
-                            '${p['car_count']} autos | Generado: \$${p['total_revenue'].toStringAsFixed(0)}',
+                            '\$${p['total_commission'].toStringAsFixed(0)} com. | \$${p['total_tips'].toStringAsFixed(0)} prop. | -\$${(p['total_loans'] + p['total_store']).toStringAsFixed(0)} deduc.',
+                            style: const TextStyle(fontSize: 12),
                           ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                '\$${p['to_pay'].toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.green,
-                                ),
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '\$${p['to_pay'].toStringAsFixed(2)}',
+                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.green),
+                                  ),
+                                  const Text('A PAGAR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                ],
                               ),
-                              const Text(
-                                'A PAGAR',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
-                                ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
+                                onPressed: () => _showAddAdjustmentDialog(p['worker_id'], p['worker_name']),
                               ),
                             ],
                           ),
                           children: [
                             const Divider(),
                             const Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               child: Row(
                                 children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      'Servicio',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      'Tipo',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      'Placa',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    'Precio',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
+                                  Expanded(flex: 2, child: Text('Detalle / Servicio', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                  Expanded(child: Text('Tipo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                  Text('Monto', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                 ],
                               ),
                             ),
+                            // List services as additions
                             ...((p['tickets'] as List).map((t) {
                               return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                                 child: Row(
                                   children: [
-                                    Expanded(
-                                      flex: 2,
-                                      child: Text(
-                                        t['service'],
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        t['type'],
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        t['plate'],
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                    ),
+                                    Expanded(flex: 2, child: Text(t['service'], style: const TextStyle(fontSize: 12))),
+                                    Expanded(child: Text(t['type'], style: const TextStyle(fontSize: 12, color: Colors.blueGrey))),
+                                    Text('+\$${t['comm']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+                                  ],
+                                ),
+                              );
+                            }).toList()),
+                            // List Ledger items (loans, tips, items)
+                            ...((p['transactions'] as List).map((tr) {
+                              final isCredit = tr['type'] == 'tip' || tr['type'] == 'bonus';
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                child: Row(
+                                  children: [
+                                    Expanded(flex: 2, child: Text(tr['description'] ?? tr['type'], style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic))),
+                                    Expanded(child: Text(tr['type'].toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
                                     Text(
-                                      '\$${t['comm']}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green,
-                                      ),
+                                      '${isCredit ? "+" : "-"}\$${tr['amount']}',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isCredit ? Colors.green : Colors.red),
                                     ),
                                   ],
                                 ),
