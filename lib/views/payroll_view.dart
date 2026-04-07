@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class PayrollView extends StatefulWidget {
   const PayrollView({super.key});
@@ -138,6 +141,129 @@ class _PayrollViewState extends State<PayrollView> {
     }
   }
 
+  Future<void> _printWeeklySummary() async {
+    final pdf = pw.Document();
+    final dateStr = '${DateFormat('dd/MM/yy').format(_dateRange.start)} - ${DateFormat('dd/MM/yy').format(_dateRange.end)}';
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Header(level: 0, child: pw.Text('RESUMEN SEMANAL DE NOMINA', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18))),
+              pw.Text('Periodo: $dateStr'),
+              pw.SizedBox(height: 20),
+              pw.TableHelper.fromTextArray(
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                headers: ['LAVADOR', 'AUTOS', 'COMIS.', 'PROP./BONO', 'PREST.', 'TIENDA', 'TOTAL'],
+                data: _payrollData.map((w) => [
+                  w['worker_name'],
+                  w['car_count'],
+                  '\$${w['total_commission'].toStringAsFixed(0)}',
+                  '\$${(w['total_tips'] + w['total_bonus']).toStringAsFixed(0)}',
+                  '\$${w['total_loans'].toStringAsFixed(0)}',
+                  '\$${w['total_store'].toStringAsFixed(0)}',
+                  '\$${w['to_pay'].toStringAsFixed(2)}',
+                ]).toList(),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text('TOTAL GENERAL: \$${_calculateGrandTotal().toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+  }
+
+  Future<void> _printIndividualReport(Map<String, dynamic> w) async {
+    final pdf = pw.Document();
+    final dateStr = '${DateFormat('dd/MM/yy').format(_dateRange.start)} - ${DateFormat('dd/MM/yy').format(_dateRange.end)}';
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Header(level: 0, child: pw.Text('COMPROBANTE DE PAGO INDIVIDUAL', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18))),
+              pw.Text('Lavador: ${w['worker_name']}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+              pw.Text('Periodo: $dateStr'),
+              pw.SizedBox(height: 20),
+              
+              pw.Text('DETALLE DE SERVICIOS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.Divider(),
+              pw.TableHelper.fromTextArray(
+                headers: ['FECHA', 'PLACA', 'SERVICIO', 'TIPO', 'COMIS.'],
+                data: (w['tickets'] as List).map((t) => [
+                  DateFormat('dd/MM HH:mm').format(DateTime.parse(t['date'])),
+                  t['plate'],
+                  t['service'],
+                  t['type'],
+                  '\$${t['comm'].toStringAsFixed(0)}',
+                ]).toList(),
+              ),
+              pw.SizedBox(height: 15),
+
+              pw.Text('AJUSTES Y DEDUCCIONES', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.Divider(),
+              pw.TableHelper.fromTextArray(
+                headers: ['FECHA', 'TIPO', 'DESCRIPCION', 'MONTO'],
+                data: (w['transactions'] as List).map((tr) => [
+                  DateFormat('dd/MM').format(DateTime.parse(tr['created_at'])),
+                  tr['type'].toString().toUpperCase(),
+                  tr['description'] ?? '-',
+                  '${(tr['type'] == 'loan' || tr['type'] == 'purchase') ? '-' : '+'}\$${tr['amount']}',
+                ]).toList(),
+              ),
+              
+              pw.SizedBox(height: 20),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(10),
+                decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                child: pw.Column(
+                  children: [
+                    pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                      pw.Text('Subtotal Comisiones:'), pw.Text('\$${w['total_commission'].toStringAsFixed(2)}')
+                    ]),
+                    pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                      pw.Text('Total Propinas/Bonos:'), pw.Text('\$${(w['total_tips'] + w['total_bonus']).toStringAsFixed(2)}')
+                    ]),
+                    pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                      pw.Text('Total Deducciones:'), pw.Text('-\$${(w['total_loans'] + w['total_store']).toStringAsFixed(2)}')
+                    ]),
+                    pw.Divider(),
+                    pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                      pw.Text('TOTAL NETO A PAGAR:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)), 
+                      pw.Text('\$${w['to_pay'].toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14))
+                    ]),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 40),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                children: [
+                  pw.Column(children: [pw.SizedBox(width: 150, child: pw.Divider()), pw.Text('Firma del Lavador')]),
+                  pw.Column(children: [pw.SizedBox(width: 150, child: pw.Divider()), pw.Text('Firma de Administracion')]),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+  }
+
   Future<void> _showAddAdjustmentDialog(String workerId, String workerName) async {
     final amountController = TextEditingController();
     final descController = TextEditingController();
@@ -215,6 +341,11 @@ class _PayrollViewState extends State<PayrollView> {
             icon: Icon(_showTable ? Icons.list : Icons.table_chart),
             tooltip: _showTable ? 'Vista de Tarjetas' : 'Vista de Tabla Semanal',
             onPressed: () => setState(() => _showTable = !_showTable),
+          ),
+          IconButton(
+            icon: const Icon(Icons.print),
+            tooltip: 'Imprimir Resumen Semanal',
+            onPressed: () => _printWeeklySummary(),
           ),
           IconButton(
             icon: const Icon(Icons.date_range),
@@ -315,9 +446,20 @@ class _PayrollViewState extends State<PayrollView> {
           child: ExpansionTile(
             title: Text(w['worker_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             subtitle: Text('Autos: ${w['car_count']}  |  Total a Pagar: \$${w['to_pay'].toStringAsFixed(2)}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600)),
-            trailing: IconButton(
-              icon: const Icon(Icons.add_circle_outline, color: Colors.indigo),
-              onPressed: () => _showAddAdjustmentDialog(w['worker_id'], w['worker_name']),
+            trailing: SizedBox(
+              width: 96,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.print, color: Colors.blue),
+                    onPressed: () => _printIndividualReport(w),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline, color: Colors.indigo),
+                    onPressed: () => _showAddAdjustmentDialog(w['worker_id'], w['worker_name']),
+                  ),
+                ],
+              ),
             ),
             children: [
               const Divider(),
