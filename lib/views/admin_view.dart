@@ -7,6 +7,8 @@ import 'clients_view.dart';
 import 'reports_view.dart';
 import 'payroll_view.dart';
 import 'catalog_view.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 class AdminView extends StatefulWidget {
   const AdminView({super.key});
@@ -16,7 +18,7 @@ class AdminView extends StatefulWidget {
 }
 
 class _AdminViewState extends State<AdminView> {
-  int _selectedIndex = 0; // 0 for Caja, 1 for Reports, 2 for Washers
+  int _selectedIndex = 0; 
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +28,7 @@ class _AdminViewState extends State<AdminView> {
           // Left Sidebar
           Container(
             width: 260,
-            color: const Color(0xFF1E3A8A), // Station Dark Blue
+            color: const Color(0xFF1E3A8A), 
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -83,6 +85,27 @@ class _AdminViewState extends State<AdminView> {
                 ),
                 const Spacer(),
                 const Divider(color: Colors.white24),
+                // Botón Limpiar Cache
+                ListTile(
+                  leading: const Icon(Icons.refresh, color: Colors.white70),
+                  title: const Text('Limpiar Cache', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  onTap: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Reiniciar Aplicación'),
+                        content: const Text('Se recargará la página para limpiar el cache. ¿Continuar?'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
+                          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Sí, Reiniciar')),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      html.window.location.reload();
+                    }
+                  },
+                ),
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.white70),
                   title: const Text('Salir', style: TextStyle(color: Colors.white70)),
@@ -116,7 +139,37 @@ class _AdminViewState extends State<AdminView> {
       default: return CajaView(onNavigate: (i) => setState(() => _selectedIndex = i));
     }
   }
+}
 
+class _SidebarItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SidebarItem({
+    required this.icon,
+    required this.title,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: isSelected ? Colors.white : Colors.white70),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.white70,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      onTap: onTap,
+      selected: isSelected,
+      selectedTileColor: Colors.white.withValues(alpha: 0.1),
+    );
+  }
 }
 
 class CajaView extends StatefulWidget {
@@ -131,8 +184,6 @@ class _CajaViewState extends State<CajaView> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _workers = [];
   List<Map<String, dynamic>> _snacks = [];
-  
-  // Cart items structure: { type: 'vehicle' | 'snack', item: Map, qty: 1 }
   final List<Map<String, dynamic>> _cart = [];
   bool _requiresInvoice = false;
   bool _isProcessing = false;
@@ -154,15 +205,17 @@ class _CajaViewState extends State<CajaView> {
     }
   }
 
-  Future<void> _deliverVehicle(String ticketId) async {
-    try {
-      await _supabase.from('cw_tickets').update({
-        'status': 'delivered',
-        'completed_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', ticketId);
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+  double _calculateTotal() {
+    double total = 0;
+    for (var c in _cart) {
+      if (c['type'] == 'vehicle') {
+        total += (c['item']['total_amount'] ?? 0.0);
+      } else {
+        final p = c['item']['price_auto'] ?? c['item']['price'] ?? 0.0;
+        total += (p is num ? p.toDouble() : double.tryParse(p.toString()) ?? 0.0) * c['qty'];
+      }
     }
+    return total;
   }
 
   void _addToCart(String type, Map<String, dynamic> item) {
@@ -184,36 +237,18 @@ class _CajaViewState extends State<CajaView> {
   }
 
   void _removeFromCart(int index) {
-    setState(() {
-      _cart.removeAt(index);
-    });
-  }
-
-  double _calculateTotal() {
-    double total = 0;
-    for (var c in _cart) {
-      if (c['type'] == 'vehicle') {
-        total += (c['item']['total_amount'] ?? 0.0);
-      } else {
-        final p = c['item']['price_auto'] ?? c['item']['price'] ?? 0.0;
-        total += (p is num ? p.toDouble() : double.tryParse(p.toString()) ?? 0.0) * c['qty'];
-      }
-    }
-    return total;
+    setState(() => _cart.removeAt(index));
   }
 
   Future<void> _processCart() async {
     if (_cart.isEmpty) return;
     setState(() => _isProcessing = true);
-    
     try {
       final vehicles = _cart.where((c) => c['type'] == 'vehicle').toList();
       final snacks = _cart.where((c) => c['type'] == 'snack').toList();
       String? billingTicketId;
 
-      // Unificar en el primer ticket o crear uno dummy si son puros snacks
       if (vehicles.isEmpty && snacks.isNotEmpty) {
-        // Direct Tiendita Sales without a vehicle attached
         final totalStr = _calculateTotal();
         final ticketResponse = await _supabase.from('cw_tickets').insert({
           'vehicle_plate': 'TIENDA',
@@ -226,9 +261,7 @@ class _CajaViewState extends State<CajaView> {
           'requires_invoice': _requiresInvoice,
           'completed_at': DateTime.now().toUtc().toIso8601String(),
         }).select().single();
-        
         billingTicketId = ticketResponse['id'];
-
         List<Map<String, dynamic>> itemsToInsert = [];
         for (var s in snacks) {
           final snackItem = s['item'];
@@ -240,17 +273,12 @@ class _CajaViewState extends State<CajaView> {
           });
         }
         await _supabase.from('cw_ticket_items').insert(itemsToInsert);
-
       } else {
-        // Procesar todos los vehiculos en el carrito
         for (var i = 0; i < vehicles.length; i++) {
           final v = vehicles[i];
           final t = v['item'];
-          
-          billingTicketId ??= t['id']; // Al primer auto por si quieren facturar
-          
+          billingTicketId ??= t['id'];
           final isReady = t['status'] == 'ready';
-          
           await _supabase.from('cw_tickets').update({
             'payment_status': 'paid',
             if (isReady) 'status': 'delivered',
@@ -258,8 +286,6 @@ class _CajaViewState extends State<CajaView> {
             'requires_invoice': _requiresInvoice && i == 0,
           }).eq('id', t['id']);
         }
-        
-        // Asignar los snacks al primer vehiculo de la lista si hay snacks
         if (snacks.isNotEmpty && billingTicketId != null) {
           List<Map<String, dynamic>> itemsToInsert = [];
           for (var s in snacks) {
@@ -272,17 +298,13 @@ class _CajaViewState extends State<CajaView> {
             });
           }
           await _supabase.from('cw_ticket_items').insert(itemsToInsert);
-          
-          // Actualizar el total_amount del ticket sumando los snacks (el auto ya trae el precio del servicio)
           final additionalAmount = snacks.fold<double>(0, (prev, s) {
              final t = s['item']['price_auto'] ?? s['item']['price'] ?? 0.0;
              return prev + (t is num ? t.toDouble() : double.tryParse(t.toString()) ?? 0.0) * s['qty'];
           });
           final firstTicket = vehicles.first['item'];
           final newTotal = (firstTicket['total_amount'] ?? 0.0) + additionalAmount;
-          
           await _supabase.from('cw_tickets').update({'total_amount': newTotal}).eq('id', billingTicketId);
-          firstTicket['total_amount'] = newTotal; // Local update
         }
       }
 
@@ -291,23 +313,10 @@ class _CajaViewState extends State<CajaView> {
           _cart.clear();
           _requiresInvoice = false;
         });
-
-        // Venta procesada exitosamente
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Venta cobrada correctamente.'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Venta cobrada correctamente.'), backgroundColor: Colors.green));
       }
     } catch (e) {
-      print('Error en POS checkout: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -357,7 +366,6 @@ class _CajaViewState extends State<CajaView> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left Panel: Tabs for Items
                 Expanded(
                   flex: 2,
                   child: Container(
@@ -386,8 +394,6 @@ class _CajaViewState extends State<CajaView> {
                     ),
                   ),
                 ),
-                
-                // Right Panel: Point of Sale Checkout
                 Container(
                   width: 380,
                   color: Colors.white,
@@ -410,7 +416,6 @@ class _CajaViewState extends State<CajaView> {
                                 final isVehicle = c['type'] == 'vehicle';
                                 final item = c['item'];
                                 final title = isVehicle ? '${item['vehicle_plate']} (${item['vehicle_model']})' : item['name'];
-
                                 return ListTile(
                                   leading: Icon(isVehicle ? Icons.directions_car : Icons.fastfood, color: Colors.indigo, size: 28),
                                   title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -423,51 +428,44 @@ class _CajaViewState extends State<CajaView> {
                               },
                             ),
                       ),
+                      const Divider(height: 1),
                       Container(
                         padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))],
-                        ),
                         child: Column(
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Total', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                                Text('\$${_calculateTotal().toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1E3A8A))),
+                                const Text('SUBTOTAL', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                                Text('\$${_calculateTotal().toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                               ],
                             ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: _requiresInvoice,
-                                  onChanged: (v) => setState(() => _requiresInvoice = v ?? false),
-                                  activeColor: const Color(0xFF1E3A8A),
-                                ),
-                                const Text('Requiere Factura CFDI', style: TextStyle(fontWeight: FontWeight.bold)),
-                              ],
+                            const SizedBox(height: 8),
+                            SwitchListTile(
+                              title: const Text('Requiere Factura', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                              value: _requiresInvoice,
+                              onChanged: (val) => setState(() => _requiresInvoice = val),
+                              contentPadding: EdgeInsets.zero,
+                              activeColor: Colors.indigo,
                             ),
                             const SizedBox(height: 16),
                             SizedBox(
                               width: double.infinity,
                               height: 60,
                               child: ElevatedButton(
-                                onPressed: _cart.isEmpty || _isProcessing ? null : _processCart,
+                                onPressed: _isProcessing ? null : _processCart,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF059669), // Emerald
+                                  backgroundColor: const Color(0xFFE53935),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  elevation: 0,
                                 ),
                                 child: _isProcessing 
                                   ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text('COBRAR IMPORTE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  : const Text('COBRAR AHORA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                               ),
-                            )
+                            ),
                           ],
                         ),
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -480,87 +478,27 @@ class _CajaViewState extends State<CajaView> {
   }
 
   Widget _buildVehiclesTab() {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _supabase
-          .from('cw_tickets')
-          .stream(primaryKey: ['id'])
-          .inFilter('status', ['queue', 'washing', 'ready'])
-          .order('created_at', ascending: true),
+    return StreamBuilder(
+      stream: _supabase.from('cw_tickets').stream(primaryKey: ['id']).order('created_at', ascending: false),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final tickets = snapshot.data!;
-        if (tickets.isEmpty) return const Center(child: Text('No hay autos en curso', style: TextStyle(fontSize: 18, color: Colors.black45)));
-
+        final all = snapshot.data as List<Map<String, dynamic>>;
+        final filtered = all.where((t) => t['status'] != 'delivered' && t['payment_status'] != 'paid').toList();
+        if (filtered.isEmpty) return const Center(child: Text('No hay autos pendientes de pago'));
         return ListView.builder(
-          itemCount: tickets.length,
-          itemBuilder: (context, index) {
-            final t = tickets[index];
-            String washerName = 'Sin asignar';
-            if (t['worker_assigned_id'] != null && _workers.isNotEmpty) {
-              try {
-                washerName = _workers.firstWhere((w) => w['id'] == t['worker_assigned_id'])['name'];
-              } catch (_) {}
-            }
-
-            final isReady = t['status'] == 'ready';
-            final isPaid = t['payment_status'] == 'paid';
-            final inCart = _cart.any((c) => c['type'] == 'vehicle' && c['item']['id'] == t['id']);
-            
-            Widget trailingWidget;
-            if (isPaid) {
-              if (isReady) {
-                trailingWidget = ElevatedButton.icon(
-                  onPressed: () => _deliverVehicle(t['id']),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                  icon: const Icon(Icons.check_circle, size: 18),
-                  label: const Text('ENTREGAR'),
-                );
-              } else {
-                trailingWidget = const Chip(
-                  label: Text('LAVANDO • PAGADO', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w900, fontSize: 11)),
-                  backgroundColor: Color(0xFFE8F5E9),
-                  side: BorderSide(color: Colors.green, width: 1.5),
-                  padding: EdgeInsets.only(left: 4, right: 4),
-                  visualDensity: VisualDensity.compact,
-                );
-              }
-            } else {
-              trailingWidget = ElevatedButton(
-                onPressed: inCart ? null : () => _addToCart('vehicle', t),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E3A8A), foregroundColor: Colors.white),
-                child: Text(inCart ? 'EN CAJA' : 'AÑADIR A CAJA'),
-              );
-            }
-
+          itemCount: filtered.length,
+          itemBuilder: (context, i) {
+            final t = filtered[i];
+            final isInCart = _cart.any((c) => c['type'] == 'vehicle' && c['item']['id'] == t['id']);
             return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: inCart ? const Color(0xFF1E3A8A) : Colors.black12, width: inCart ? 2 : 1)),
+              margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                leading: Container(
-                  width: 50, height: 50,
-                  decoration: BoxDecoration(color: inCart ? const Color(0xFF1E3A8A).withValues(alpha: 0.1) : Colors.grey[100], borderRadius: BorderRadius.circular(12)),
-                  child: Icon(Icons.directions_car, color: inCart ? const Color(0xFF1E3A8A) : Colors.grey[600]),
-                ),
-                title: Row(
-                  children: [
-                    Text(t['vehicle_plate'] ?? 'S/N', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                    const SizedBox(width: 8),
-                    if (isReady && !isPaid)
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(4)), child: const Text('Listo', style: TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold))),
-                  ],
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 4),
-                    Text('${t['vehicle_model']} • \$${t['total_amount']}', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87, fontSize: 14)),
-                    const SizedBox(height: 4),
-                    Text('Lavador: $washerName', style: const TextStyle(color: Colors.black54, fontSize: 13)),
-                  ],
-                ),
-                trailing: trailingWidget,
+                leading: const Icon(Icons.drive_eta, color: Colors.blueAccent),
+                title: Text('${t['vehicle_plate']} - ${t['vehicle_model']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('Estado: ${t['status'].toString().toUpperCase()}'),
+                trailing: Text('\$${t['total_amount']}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
+                onTap: isInCart ? null : () => _addToCart('vehicle', t),
+                enabled: !isInCart,
               ),
             );
           },
@@ -570,263 +508,29 @@ class _CajaViewState extends State<CajaView> {
   }
 
   Widget _buildSnacksTab() {
-    if (_snacks.isEmpty) return const Center(child: Text('No hay productos en la tiendita.'));
-    
+    if (_snacks.isEmpty) return const Center(child: Text('No hay productos registrados'));
     return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 0.8,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 1.2, crossAxisSpacing: 16, mainAxisSpacing: 16),
       itemCount: _snacks.length,
-      itemBuilder: (context, index) {
-        final s = _snacks[index];
-        final priceRaw = s['price_auto'] ?? s['price'] ?? 0.0;
-        final price = priceRaw is num ? priceRaw.toDouble() : double.tryParse(priceRaw.toString()) ?? 0.0;
-
+      itemBuilder: (context, i) {
+        final s = _snacks[i];
+        final price = (s['price_auto'] ?? s['price'] ?? 0.0);
         return InkWell(
           onTap: () => _addToCart('snack', s),
           child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.orange.withValues(alpha: 0.3), width: 2),
-            ),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey[200]!)),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.fastfood, size: 48, color: Colors.orange),
-                const SizedBox(height: 12),
-                Text(s['name'] ?? '', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const Icon(Icons.fastfood, color: Colors.orange, size: 32),
                 const SizedBox(height: 8),
-                Text('\$${price.toStringAsFixed(2)}', style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w900, fontSize: 16)),
+                Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                Text('\$$price', style: const TextStyle(color: Colors.orange)),
               ],
             ),
           ),
         );
       },
-    );
-  }
-}
-
-class _TicketCard extends StatefulWidget {
-  final Map<String, dynamic> ticket;
-  final String washerName;
-  final Function(bool) onProcess;
-
-  const _TicketCard({required this.ticket, required this.washerName, required this.onProcess});
-
-  @override
-  State<_TicketCard> createState() => _TicketCardState();
-}
-
-class _TicketCardState extends State<_TicketCard> {
-  bool _requiresInvoice = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = widget.ticket;
-    final isReady = t['status'] == 'ready';
-    final isPaid = t['payment_status'] == 'paid';
-    
-    Color statusColor = Colors.orange;
-    String statusLabel = 'En Cola';
-
-    final createdAt = DateTime.parse(t['created_at']).toLocal();
-    final timeStr = '${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
-    final dateStr = '${createdAt.day.toString().padLeft(2, '0')}/${createdAt.month.toString().padLeft(2, '0')}';
-    final entryDateTime = '$dateStr - $timeStr';
-    
-    if (t['status'] == 'washing') {
-      statusColor = Colors.blue;
-      statusLabel = 'Lavando';
-    } else if (t['status'] == 'ready') {
-      statusColor = Colors.green;
-      statusLabel = 'Listo';
-    }
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.black12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Container(
-              width: 12,
-              height: 60,
-              decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(6)),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(t['vehicle_plate'] ?? 'S/N', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 12),
-                      if (t['vehicle_type'] != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(4)),
-                          child: Text(t['vehicle_type'], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
-                        ),
-                    ],
-                  ),
-                  Text('${t['vehicle_model']} • ${t['vehicle_color']}', style: const TextStyle(color: Colors.black54)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                        child: Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                        child: Text(entryDateTime, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold, fontSize: 11)),
-                      ),
-                      const SizedBox(width: 8),
-                      if (t['worker_assigned_id'] != null)
-                         Text('Lava: ${widget.washerName}', style: const TextStyle(fontSize: 11, color: Colors.purple, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Factura Option
-            if (isReady) ...[
-              Column(
-                children: [
-                  const Text('Factura?', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                  Checkbox(
-                    value: _requiresInvoice,
-                    onChanged: (val) => setState(() => _requiresInvoice = val ?? false),
-                    activeColor: const Color(0xFF1E3A8A),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 20),
-            ],
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('\$${t['total_amount']}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF1E3A8A))),
-                Text(isPaid ? 'PAGADO' : 'PENDIENTE', style: TextStyle(color: isPaid ? Colors.green : Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-              ],
-            ),
-            const SizedBox(width: 32),
-            if (isReady)
-              ElevatedButton(
-                onPressed: () => widget.onProcess(_requiresInvoice),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E3A8A),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(isPaid ? 'ENTREGAR' : 'COBRAR Y ENTREGAR'),
-              )
-            else
-              const Icon(Icons.access_time, color: Colors.black26, size: 32),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ElapsedTimeDisplay extends StatefulWidget {
-  final String startTime;
-  const _ElapsedTimeDisplay({required this.startTime});
-
-  @override
-  State<_ElapsedTimeDisplay> createState() => _ElapsedTimeDisplayState();
-}
-
-class _ElapsedTimeDisplayState extends State<_ElapsedTimeDisplay> {
-  Timer? _timer;
-  late DateTime _start;
-
-  @override
-  void initState() {
-    super.initState();
-    _start = DateTime.parse(widget.startTime).toLocal();
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final diff = DateTime.now().difference(_start);
-    final hours = diff.inHours;
-    final minutes = diff.inMinutes % 60;
-    
-    String timeStr = '';
-    if (hours > 0) {
-      timeStr = '$hours h $minutes m';
-    } else {
-      timeStr = '$minutes min';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-      child: Row(
-        children: [
-          const Icon(Icons.timer, size: 14, color: Colors.deepOrange),
-          const SizedBox(width: 4),
-          Text(
-            timeStr,
-            style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SidebarItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _SidebarItem({
-    required this.icon,
-    required this.title,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon, color: isSelected ? Colors.white : Colors.white70),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white70,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        tileColor: isSelected ? Colors.white.withValues(alpha: 0.1) : null,
-      ),
     );
   }
 }
@@ -844,20 +548,14 @@ class _QuickActionCard extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.3)),
-          ),
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(width: 12),
-              Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+              Icon(icon, color: Colors.white, size: 32),
+              const SizedBox(width: 16),
+              Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
         ),
@@ -865,4 +563,3 @@ class _QuickActionCard extends StatelessWidget {
     );
   }
 }
-
