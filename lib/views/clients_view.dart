@@ -23,6 +23,8 @@ class _ClientsViewState extends State<ClientsView> {
   String _selectedClientType = "FACTURA";
   bool _hasCredit = false;
   final _creditLimitController = TextEditingController();
+  List<Map<String, dynamic>> _clientVehicles = []; // Vehículos del cliente siendo editado
+  bool _loadingVehicles = false;
 
   final Map<String, String> _regimenesFisica = {
     "605": "605 - Sueldos y salarios",
@@ -103,6 +105,11 @@ class _ClientsViewState extends State<ClientsView> {
       _selectedClientType = client['client_type'] ?? 'FACTURA';
       _hasCredit = client['has_credit'] ?? false;
       _creditLimitController.text = (client['credit_limit'] ?? 0.0).toString();
+      
+      // Cargar vehículos del cliente
+      _loadingVehicles = true;
+      _clientVehicles = [];
+      _fetchClientVehicles(client['name']);
     } else {
       _nameController.clear();
       _rfcController.clear();
@@ -113,6 +120,8 @@ class _ClientsViewState extends State<ClientsView> {
       _selectedClientType = "FACTURA";
       _hasCredit = false;
       _creditLimitController.text = "0.0";
+      _clientVehicles = [];
+      _loadingVehicles = false;
     }
 
     showDialog(
@@ -238,6 +247,67 @@ class _ClientsViewState extends State<ClientsView> {
                       prefixIcon: Icon(Icons.account_balance_wallet),
                     ),
                   ),
+                
+                if (client != null) ...[
+                  const Divider(height: 32),
+                  const Text('VEHÍCULOS REGISTRADOS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.purple)),
+                  if (_loadingVehicles)
+                    const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: CircularProgressIndicator(),
+                    )
+                  else if (_clientVehicles.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Text('Sin vehículos registrados', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    )
+                  else
+                    ..._clientVehicles.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final v = entry.value;
+                      return Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.directions_car, size: 16, color: Colors.purple),
+                                const SizedBox(width: 8),
+                                Text(v['vehicle_plate'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                const Spacer(),
+                                Text(v['vehicle_type'] ?? 'AUTO', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    decoration: const InputDecoration(labelText: 'Modelo', isDense: true),
+                                    onChanged: (val) => _clientVehicles[idx]['vehicle_model'] = val,
+                                    controller: TextEditingController(text: v['vehicle_model']),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    decoration: const InputDecoration(labelText: 'Color', isDense: true),
+                                    onChanged: (val) => _clientVehicles[idx]['vehicle_color'] = val,
+                                    controller: TextEditingController(text: v['vehicle_color']),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                ],
               ],
             ),
           ),
@@ -268,10 +338,23 @@ class _ClientsViewState extends State<ClientsView> {
                   if (client == null) {
                     await _supabase.from('cw_clients').insert(clientData);
                   } else {
+                    // 1. Actualizar datos del cliente
                     await _supabase
                         .from('cw_clients')
                         .update(clientData)
                         .eq('id', client['id']);
+                    
+                    // 2. Actualizar vehículos en tickets históricos
+                    for (var v in _clientVehicles) {
+                      await _supabase
+                          .from('cw_tickets')
+                          .update({
+                            'vehicle_model': v['vehicle_model'],
+                            'vehicle_color': v['vehicle_color'],
+                          })
+                          .eq('vehicle_plate', v['vehicle_plate'])
+                          .eq('customer_name', client['name']);
+                    }
                   }
                   Navigator.pop(context);
                   _fetchClients();
@@ -287,6 +370,35 @@ class _ClientsViewState extends State<ClientsView> {
         ),
       ),
     );
+  }
+
+  Future<void> _fetchClientVehicles(String clientName) async {
+    try {
+      final res = await _supabase
+          .from('cw_tickets')
+          .select('vehicle_plate, vehicle_model, vehicle_color, vehicle_type')
+          .eq('customer_name', clientName);
+      
+      final List<Map<String, dynamic>> all = List<Map<String, dynamic>>.from(res);
+      // Quedarnos con el último registro de cada placa
+      final Map<String, Map<String, dynamic>> unique = {};
+      for (var v in all) {
+        final plate = v['vehicle_plate']?.toString().toUpperCase().trim() ?? '';
+        if (plate.isNotEmpty) {
+          unique[plate] = Map<String, dynamic>.from(v);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _clientVehicles = unique.values.toList();
+          _loadingVehicles = false;
+        });
+      }
+    } catch (e) {
+      print('Error en _fetchClientVehicles: $e');
+      if (mounted) setState(() => _loadingVehicles = false);
+    }
   }
 
   Widget _buildBadge(String text, Color color) {
