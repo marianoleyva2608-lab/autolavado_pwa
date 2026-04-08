@@ -88,7 +88,12 @@ class _PayrollViewState extends State<PayrollView> {
             else if (vType == 'G') commKey = 'comm_g';
             else if (vType == 'XL') commKey = 'comm_xl';
 
-            ticketCommissionValue = (svc[commKey] as num?)?.toDouble() ?? 0.0;
+            // Si tiene comisión especial manual, usar esa. Si no, usar la del catálogo.
+            if (t['special_commission'] != null) {
+              ticketCommissionValue = (t['special_commission'] as num).toDouble();
+            } else {
+              ticketCommissionValue = (svc[commKey] as num?)?.toDouble() ?? 0.0;
+            }
           }
 
           ticketDetails.add({

@@ -17,17 +17,17 @@ class _ReceptionViewState extends State<ReceptionView> {
   final TextEditingController _plateController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
   final TextEditingController _colorController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
-  
-  String _paymentOption = 'postpago'; // 'prepago' o 'postpago'
+  final _priceController = TextEditingController();
+  final _commissionController = TextEditingController();
+  bool _isSubmitting = false;
+
+  String _paymentOption = 'postpago';
   Map<String, dynamic>? _selectedService;
   String _vehicleType = 'AUTO';
-  
   List<Map<String, dynamic>> _services = [];
   List<Map<String, dynamic>> _snacks = [];
-  Map<String, int> _selectedSnacks = {}; // ID -> quantity
+  Map<String, int> _selectedSnacks = {};
   bool _isLoading = true;
-  bool _isSubmitting = false;
 
   final List<String> _vehicleTypes = ['AUTO', 'SUV CH', 'SUV M', 'G', 'XL'];
 
@@ -45,6 +45,7 @@ class _ReceptionViewState extends State<ReceptionView> {
     _modelController.dispose();
     _colorController.dispose();
     _priceController.dispose();
+    _commissionController.dispose();
     super.dispose();
   }
 
@@ -107,7 +108,12 @@ class _ReceptionViewState extends State<ReceptionView> {
     }
     
     setState(() {
-      _priceController.text = price.toStringAsFixed(0);
+      // No sobrescribir si es SERVICIO ESPECIAL y ya tiene un valor (para no borrar lo que el usuario escribió)
+      if (_selectedService?['name'] == 'SERVICIO ESPECIAL' && _priceController.text.isNotEmpty && _priceController.text != '0') {
+        // Mantener valor actual
+      } else {
+        _priceController.text = price.toStringAsFixed(0);
+      }
     });
   }
 
@@ -173,6 +179,9 @@ class _ReceptionViewState extends State<ReceptionView> {
       });
       
       // 1. Insert Ticket
+      final isSpecialSvc = _selectedService?['name'] == 'SERVICIO ESPECIAL';
+      final commission = isSpecialSvc ? (double.tryParse(_commissionController.text) ?? 0.0) : null;
+
       final ticketResponse = await _supabase.from('cw_tickets').insert({
         'customer_name': _customerNameController.text.trim(),
         'customer_phone': _customerPhoneController.text.trim(),
@@ -183,6 +192,7 @@ class _ReceptionViewState extends State<ReceptionView> {
         'status': 'queue',
         'payment_status': paymentStatus,
         'total_amount': grandTotal,
+        'special_commission': commission,
       }).select().single();
 
       final ticketId = ticketResponse['id'];
@@ -221,6 +231,7 @@ class _ReceptionViewState extends State<ReceptionView> {
         _plateController.clear();
         _modelController.clear();
         _colorController.clear();
+        _commissionController.clear();
         setState(() {
           _paymentOption = 'postpago';
           _selectedSnacks = {};
@@ -448,19 +459,54 @@ class _ReceptionViewState extends State<ReceptionView> {
                       ),
                       
                       const SizedBox(height: 24),
-                      TextFormField(
-                        controller: _priceController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'Precio Final (Ajustable)',
-                          prefixText: '\$ ',
-                          // El icono ya no es necesario con el prefijo de texto
-                          filled: true,
-                          fillColor: Colors.green[50],
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        ),
+                      // Precio y Comisión (si es especial)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Precio Final (Ajustable)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: _priceController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    prefixText: '\$ ',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                    filled: true,
+                                    fillColor: Colors.green.withOpacity(0.1),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_selectedService?['name'] == 'SERVICIO ESPECIAL') ...[
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Comisión Lavador', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _commissionController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      prefixText: '\$ ',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                      filled: true,
+                                      fillColor: Colors.orange.withOpacity(0.1),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                              const SizedBox(height: 32),
+                      
+                      const SizedBox(height: 32),
                       SizedBox(
                         width: double.infinity,
                         height: 60,
