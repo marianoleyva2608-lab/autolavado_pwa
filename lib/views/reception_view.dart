@@ -243,14 +243,29 @@ class _ReceptionViewState extends State<ReceptionView> {
     'NEGRO': Colors.black,
     'GRIS': Colors.grey,
     'PLATA': const Color(0xFFC0C0C0),
+    'GRIS OSCURO': const Color(0xFF4B4B4B),
+    'BLANCO PERLA': const Color(0xFFFDEEF4),
     'AZUL': Colors.blue.shade900,
+    'AZUL METÁLICO': const Color(0xFF003366),
+    'AZUL CIELO': Colors.blue.shade300,
+    'AZUL MARINO': const Color(0xFF000080),
     'ROJO': Colors.red.shade900,
+    'ROJO CEREZA': const Color(0xFF990000),
+    'VINO': const Color(0xFF722F37),
     'CAFÉ': Colors.brown,
     'BEIGE': const Color(0xFFF5F5DC),
+    'ARENA': const Color(0xFFC2B280),
+    'CHAMPAGNE': const Color(0xFFF7E7CE),
+    'MARFIL': const Color(0xFFFFFFF0),
     'DORADO': const Color(0xFFFFD700),
+    'BRONCE': const Color(0xFFCD7F32),
     'VERDE': Colors.green.shade900,
+    'VERDE LIMA': Colors.lime,
+    'TURQUESA': Colors.teal.shade300,
     'NARANJA': Colors.orange.shade900,
     'AMARILLO': Colors.yellow.shade700,
+    'MORADO': Colors.purple.shade900,
+    'ROSA': Colors.pink.shade300,
   };
 
   void _showColorPicker() {
@@ -260,13 +275,15 @@ class _ReceptionViewState extends State<ReceptionView> {
         title: const Text('Seleccionar Color'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: SizedBox(
-          width: 300,
+          width: 500, // Aumentar ancho para ver más opciones
+          height: 400, // Altura fija para scroll
           child: GridView.builder(
             shrinkWrap: true,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+              crossAxisCount: 4, // 4 columnas para 24+ colores
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.85,
             ),
             itemCount: _carColors.length,
             itemBuilder: (context, i) {
