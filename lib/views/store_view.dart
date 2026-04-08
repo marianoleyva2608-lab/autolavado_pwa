@@ -217,43 +217,42 @@ class _StoreViewState extends State<StoreView> {
                     return Card(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 1,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: imageUrl != null && imageUrl.toString().isNotEmpty
-                                ? Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(Icons.fastfood, size: 30, color: Colors.orange))
-                                : const Icon(Icons.fastfood, size: 30, color: Colors.orange),
+                      child: InkWell(
+                        onTap: () => setState(() => _cart[p['id']] = qty + 1),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: imageUrl != null && imageUrl.toString().isNotEmpty
+                                  ? Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(Icons.fastfood, size: 30, color: Colors.orange))
+                                  : const Icon(Icons.fastfood, size: 30, color: Colors.orange),
+                              ),
                             ),
-                          ),
-                          Text(p['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          Text('\$${p['price']}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, size: 20),
-                                onPressed: qty > 0 ? () => setState(() => _cart[p['id']] = qty - 1) : null,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                child: Text('$qty', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline, size: 20),
-                                onPressed: () => setState(() => _cart[p['id']] = qty + 1),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                        ],
+                            Text(p['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text('\$${p['price']}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (qty > 0)
+                                  IconButton(
+                                    icon: const Icon(Icons.remove_circle_outline, size: 20, color: Colors.red),
+                                    onPressed: () => setState(() => _cart[p['id']] = qty - 1),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                  child: Text(qty > 0 ? '$qty' : '0', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: qty > 0 ? Colors.blue : Colors.grey)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                        ),
                       ),
                     );
                   },
