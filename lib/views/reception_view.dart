@@ -238,6 +238,78 @@ class _ReceptionViewState extends State<ReceptionView> {
     }
   }
 
+  final Map<String, Color> _carColors = {
+    'BLANCO': Colors.white,
+    'NEGRO': Colors.black,
+    'GRIS': Colors.grey,
+    'PLATA': const Color(0xFFC0C0C0),
+    'AZUL': Colors.blue.shade900,
+    'ROJO': Colors.red.shade900,
+    'CAFÉ': Colors.brown,
+    'BEIGE': const Color(0xFFF5F5DC),
+    'DORADO': const Color(0xFFFFD700),
+    'VERDE': Colors.green.shade900,
+    'NARANJA': Colors.orange.shade900,
+    'AMARILLO': Colors.yellow.shade700,
+  };
+
+  void _showColorPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Seleccionar Color'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: SizedBox(
+          width: 300,
+          child: GridView.builder(
+            shrinkWrap: true,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: _carColors.length,
+            itemBuilder: (context, i) {
+              final entry = _carColors.entries.elementAt(i);
+              return InkWell(
+                onTap: () {
+                  setState(() => _colorController.text = entry.key);
+                  Navigator.pop(context);
+                },
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: entry.value,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade300),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      entry.key,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -300,7 +372,7 @@ class _ReceptionViewState extends State<ReceptionView> {
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildTextField('Color', Icons.palette, _colorController),
+                            child: _buildTextField('Color', Icons.palette, _colorController, readOnly: true, onTap: _showColorPicker),
                           ),
                         ],
                       ),
@@ -394,9 +466,11 @@ class _ReceptionViewState extends State<ReceptionView> {
           ),
     );
   }
-  Widget _buildTextField(String label, IconData icon, TextEditingController controller, {bool isPhone = false}) {
+  Widget _buildTextField(String label, IconData icon, TextEditingController controller, {bool isPhone = false, bool readOnly = false, VoidCallback? onTap}) {
     return TextFormField(
       controller: controller,
+      readOnly: readOnly,
+      onTap: onTap,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon),
