@@ -161,10 +161,17 @@ class _QueueViewState extends State<QueueView> {
           'status': 'washing',
           'worker_assigned_id': selectedWorkerId,
         }).eq('id', ticketId);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Lavado iniciado'), backgroundColor: Colors.blue),
+          );
+          if (_usePolling) _fetchTickets();
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -174,8 +181,22 @@ class _QueueViewState extends State<QueueView> {
   Future<void> _updateStatus(String id, String newStatus) async {
     try {
       await _supabase.from('cw_tickets').update({'status': newStatus}).eq('id', id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newStatus == 'ready' ? 'Vehículo listo' : 'Estado actualizado'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+        if (_usePolling) _fetchTickets();
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
