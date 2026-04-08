@@ -23,105 +23,20 @@ class _AdminViewState extends State<AdminView> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 1000;
+
     return Scaffold(
+      appBar: isMobile ? AppBar(
+        title: const Text('STATION ADMIN'),
+        backgroundColor: const Color(0xFF1E3A8A),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ) : null,
+      drawer: isMobile ? Drawer(child: _buildSidebar(isDrawer: true)) : null,
       body: Row(
         children: [
-          // Left Sidebar
-          Container(
-            width: 260,
-            color: const Color(0xFF1E3A8A), 
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 48),
-                const Icon(Icons.local_car_wash, size: 64, color: Colors.white),
-                const SizedBox(height: 16),
-                const Text(
-                  'STATION ADMIN',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 2),
-                ),
-                const SizedBox(height: 48),
-                _SidebarItem(
-                  icon: Icons.point_of_sale,
-                  title: 'Caja / Control',
-                  isSelected: _selectedIndex == 0,
-                  onTap: () => setState(() => _selectedIndex = 0),
-                ),
-                _SidebarItem(
-                  icon: Icons.receipt_long,
-                  title: 'Facturación CFDI',
-                  isSelected: _selectedIndex == 4,
-                  onTap: () => setState(() => _selectedIndex = 4),
-                ),
-                _SidebarItem(
-                  icon: Icons.payments_outlined,
-                  title: 'Nómina de Lavadores',
-                  isSelected: _selectedIndex == 7,
-                  onTap: () => setState(() => _selectedIndex = 7),
-                ),
-                _SidebarItem(
-                  icon: Icons.calendar_view_week,
-                  title: 'Reportes Semanales',
-                  isSelected: _selectedIndex == 8,
-                  onTap: () => setState(() => _selectedIndex = 8),
-                ),
-                _SidebarItem(
-                  icon: Icons.history,
-                  title: 'Historial / Ventas',
-                  isSelected: _selectedIndex == 1,
-                  onTap: () => setState(() => _selectedIndex = 1),
-                ),
-                _SidebarItem(
-                  icon: Icons.people_outline,
-                  title: 'Equipo Lavadores',
-                  isSelected: _selectedIndex == 2,
-                  onTap: () => setState(() => _selectedIndex = 2),
-                ),
-                _SidebarItem(
-                  icon: Icons.inventory_2_outlined,
-                  title: 'Catálogo y Precios',
-                  isSelected: _selectedIndex == 5,
-                  onTap: () => setState(() => _selectedIndex = 5),
-                ),
-                _SidebarItem(
-                  icon: Icons.people,
-                  title: 'Clientes',
-                  isSelected: _selectedIndex == 3,
-                  onTap: () => setState(() => _selectedIndex = 3),
-                ),
-                const Spacer(),
-                const Divider(color: Colors.white24),
-                // Botón Limpiar Cache
-                ListTile(
-                  leading: const Icon(Icons.refresh, color: Colors.white70),
-                  title: const Text('Limpiar Cache', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                  onTap: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Reiniciar Aplicación'),
-                        content: const Text('Se recargará la página para limpiar el cache. ¿Continuar?'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
-                          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Sí, Reiniciar')),
-                        ],
-                      ),
-                    );
-                    if (confirm == true) {
-                      html.window.location.reload();
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.white70),
-                  title: const Text('Salir', style: TextStyle(color: Colors.white70)),
-                  onTap: () => Navigator.pop(context),
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
+          if (!isMobile) _buildSidebar(),
           // Main Content
           Expanded(
             child: Container(
@@ -129,6 +44,141 @@ class _AdminViewState extends State<AdminView> {
               child: _buildMainContent(),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebar({bool isDrawer = false}) {
+    return Container(
+      width: 260,
+      color: const Color(0xFF1E3A8A), 
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!isDrawer) ...[
+            const SizedBox(height: 48),
+            const Icon(Icons.local_car_wash, size: 64, color: Colors.white),
+            const SizedBox(height: 16),
+            const Text(
+              'STATION ADMIN',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 2),
+            ),
+            const SizedBox(height: 48),
+          ] else ...[
+            DrawerHeader(
+              decoration: const BoxDecoration(color: Color(0xFF1E3A8A)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.local_car_wash, size: 48, color: Colors.white),
+                  const SizedBox(height: 12),
+                  const Text('STATION ADMIN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ],
+          _SidebarItem(
+            icon: Icons.point_of_sale,
+            title: 'Caja / Control',
+            isSelected: _selectedIndex == 0,
+            onTap: () {
+              setState(() => _selectedIndex = 0);
+              if (isDrawer) Navigator.pop(context);
+            },
+          ),
+          _SidebarItem(
+            icon: Icons.receipt_long,
+            title: 'Facturación CFDI',
+            isSelected: _selectedIndex == 4,
+            onTap: () {
+              setState(() => _selectedIndex = 4);
+              if (isDrawer) Navigator.pop(context);
+            },
+          ),
+          _SidebarItem(
+            icon: Icons.payments_outlined,
+            title: 'Nómina de Lavadores',
+            isSelected: _selectedIndex == 7,
+            onTap: () {
+              setState(() => _selectedIndex = 7);
+              if (isDrawer) Navigator.pop(context);
+            },
+          ),
+          _SidebarItem(
+            icon: Icons.calendar_view_week,
+            title: 'Reportes Semanales',
+            isSelected: _selectedIndex == 8,
+            onTap: () {
+              setState(() => _selectedIndex = 8);
+              if (isDrawer) Navigator.pop(context);
+            },
+          ),
+          _SidebarItem(
+            icon: Icons.history,
+            title: 'Historial / Ventas',
+            isSelected: _selectedIndex == 1,
+            onTap: () {
+              setState(() => _selectedIndex = 1);
+              if (isDrawer) Navigator.pop(context);
+            },
+          ),
+          _SidebarItem(
+            icon: Icons.people_outline,
+            title: 'Equipo Lavadores',
+            isSelected: _selectedIndex == 2,
+            onTap: () {
+              setState(() => _selectedIndex = 2);
+              if (isDrawer) Navigator.pop(context);
+            },
+          ),
+          _SidebarItem(
+            icon: Icons.inventory_2_outlined,
+            title: 'Catálogo y Precios',
+            isSelected: _selectedIndex == 5,
+            onTap: () {
+              setState(() => _selectedIndex = 5);
+              if (isDrawer) Navigator.pop(context);
+            },
+          ),
+          _SidebarItem(
+            icon: Icons.people,
+            title: 'Clientes',
+            isSelected: _selectedIndex == 3,
+            onTap: () {
+              setState(() => _selectedIndex = 3);
+              if (isDrawer) Navigator.pop(context);
+            },
+          ),
+          const Spacer(),
+          const Divider(color: Colors.white24),
+          ListTile(
+            leading: const Icon(Icons.refresh, color: Colors.white70),
+            title: const Text('Limpiar Cache', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Reiniciar Aplicación'),
+                  content: const Text('Se recargará la página para limpiar el cache. ¿Continuar?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
+                    ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Sí, Reiniciar')),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                html.window.location.reload();
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.white70),
+            title: const Text('Salir', style: TextStyle(color: Colors.white70)),
+            onTap: () => Navigator.pop(context),
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -191,9 +241,12 @@ class CajaView extends StatefulWidget {
 class _CajaViewState extends State<CajaView> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _snacks = [];
+  List<Map<String, dynamic>> _workers = [];
   final List<Map<String, dynamic>> _cart = [];
   bool _requiresInvoice = false;
   bool _isProcessing = false;
+  String _searchQuery = "";
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -202,11 +255,17 @@ class _CajaViewState extends State<CajaView> {
   }
 
   Future<void> _fetchData() async {
-    final sRes = await _supabase.from('cw_services').select().eq('category', 'tiendita').eq('is_active', true);
-    if (mounted) {
-      setState(() {
-        _snacks = List<Map<String, dynamic>>.from(sRes);
-      });
+    try {
+      final sRes = await _supabase.from('cw_services').select().eq('category', 'tiendita').eq('is_active', true);
+      final wRes = await _supabase.from('cw_workers').select().eq('role', 'washer').eq('is_active', true);
+      if (mounted) {
+        setState(() {
+          _snacks = List<Map<String, dynamic>>.from(sRes);
+          _workers = List<Map<String, dynamic>>.from(wRes);
+        });
+      }
+    } catch (e) {
+      print('Error en _fetchData: $e');
     }
   }
 
@@ -232,6 +291,9 @@ class _CajaViewState extends State<CajaView> {
         } else {
           _cart.add({'type': 'snack', 'item': item, 'qty': 1});
         }
+        // Limpiar búsqueda al agregar (solicitud del usuario para que se borren)
+        _searchQuery = "";
+        _searchController.clear();
       } else if (type == 'vehicle') {
         final existing = _cart.indexWhere((c) => c['type'] == 'vehicle' && c['item']['id'] == item['id']);
         if (existing < 0) {
@@ -269,9 +331,9 @@ class _CajaViewState extends State<CajaView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
         label,
@@ -286,7 +348,7 @@ class _CajaViewState extends State<CajaView> {
     final minutes = diff.inMinutes;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: Colors.grey.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -316,51 +378,125 @@ class _CajaViewState extends State<CajaView> {
 
   Future<void> _processCart() async {
     if (_cart.isEmpty) return;
+
+    // 1. Seleccionar Método de Pago
+    final String? method = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Seleccionar Método de Pago', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), shape: BoxShape.circle),
+                child: const Icon(Icons.payments, color: Colors.green),
+              ),
+              title: const Text('Pago en Efectivo / Tarjeta', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Venta cobrada al momento'),
+              onTap: () => Navigator.pop(context, 'cash'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), shape: BoxShape.circle),
+                child: const Icon(Icons.person, color: Colors.blue),
+              ),
+              title: const Text('Crédito Lavador (Vale)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Deducir de nómina'),
+              onTap: () => Navigator.pop(context, 'vale'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (method == null) return;
+
     setState(() => _isProcessing = true);
     try {
       final vehicles = _cart.where((c) => c['type'] == 'vehicle').toList();
       final snacks = _cart.where((c) => c['type'] == 'snack').toList();
+      final totalAmount = _calculateTotal();
 
-      // Check for credit if a vehicle is involved
       String paymentStatus = 'paid';
-      final clientCredit = await _checkClientCredit(vehicles);
-      if (clientCredit != null) {
-        final useCredit = await showDialog<bool>(
+      String? workerId;
+
+      if (method == 'vale') {
+        // Seleccionar Trabajador
+        if (!context.mounted) return;
+        final Map<String, dynamic>? selectedWorker = await showDialog<Map<String, dynamic>>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Cliente con Crédito Detectado'),
-            content: Text('${clientCredit['name']} tiene línea de crédito activa.\n¿Desea mandar esta venta a CRÉDITO o cobrar en EFECTIVO/TARJETA?'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('COBRAR AHORA')),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true), 
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('MANDAR A CRÉDITO')
+            title: const Text('Seleccionar Lavador'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _workers.length,
+                itemBuilder: (context, i) => ListTile(
+                  title: Text(_workers[i]['name']),
+                  onTap: () => Navigator.pop(context, _workers[i]),
+                ),
               ),
-            ],
-          )
+            ),
+          ),
         );
-        if (useCredit == true) {
-          paymentStatus = 'credit';
+
+        if (selectedWorker == null) {
+          setState(() => _isProcessing = false);
+          return;
+        }
+        workerId = selectedWorker['id'];
+        paymentStatus = 'paid'; // Marcamos como pagado porque ya se registró la deuda en el ledger
+      } else {
+        // Pago normal: Verificar crédito de cliente si hay vehículo
+        if (!context.mounted) return;
+        final clientCredit = await _checkClientCredit(vehicles);
+        if (clientCredit != null) {
+          if (!context.mounted) return;
+          final useCredit = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Cliente con Crédito Detectado'),
+              content: Text('${clientCredit['name']} tiene línea de crédito activa.\n¿Desea mandar esta venta a CRÉDITO o cobrar en EFECTIVO/TARJETA?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('COBRAR AHORA')),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true), 
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  child: const Text('MANDAR A CRÉDITO')
+                ),
+              ],
+            )
+          );
+          if (useCredit == true) {
+            paymentStatus = 'credit';
+          }
         }
       }
 
       String? billingTicketId;
 
+      // 2. Procesar Venta
       if (vehicles.isEmpty && snacks.isNotEmpty) {
-        final totalStr = _calculateTotal();
+        // Venta solo de snacks
         final ticketResponse = await _supabase.from('cw_tickets').insert({
-          'vehicle_plate': 'TIENDA',
+          'vehicle_plate': method == 'vale' ? 'VALE TIENDA' : 'TIENDA',
           'vehicle_model': 'Venta Directa',
           'vehicle_color': '-',
           'vehicle_type': 'AUTO',
           'status': 'delivered',
-          'payment_status': 'paid',
-          'total_amount': totalStr,
+          'payment_status': paymentStatus,
+          'total_amount': totalAmount,
           'requires_invoice': _requiresInvoice,
           'completed_at': DateTime.now().toUtc().toIso8601String(),
         }).select().single();
         billingTicketId = ticketResponse['id'];
+
         List<Map<String, dynamic>> itemsToInsert = [];
         for (var s in snacks) {
           final snackItem = s['item'];
@@ -373,6 +509,7 @@ class _CajaViewState extends State<CajaView> {
         }
         await _supabase.from('cw_ticket_items').insert(itemsToInsert);
       } else {
+        // Venta con vehículos (y snacks opcionales)
         for (var i = 0; i < vehicles.length; i++) {
           final v = vehicles[i];
           final t = v['item'];
@@ -385,26 +522,45 @@ class _CajaViewState extends State<CajaView> {
             'requires_invoice': _requiresInvoice && i == 0,
           }).eq('id', t['id']);
         }
+        
         if (snacks.isNotEmpty && billingTicketId != null) {
           List<Map<String, dynamic>> itemsToInsert = [];
+          double snacksTotal = 0;
           for (var s in snacks) {
             final snackItem = s['item'];
+            final p = snackItem['price_auto'] ?? snackItem['price'] ?? 0.0;
+            final price = p is num ? p.toDouble() : double.tryParse(p.toString()) ?? 0.0;
+            snacksTotal += price * s['qty'];
             itemsToInsert.add({
               'ticket_id': billingTicketId,
               'service_id': snackItem['id'],
-              'price_at_time': snackItem['price_auto'] ?? snackItem['price'] ?? 0.0,
+              'price_at_time': price,
               'quantity': s['qty'],
             });
           }
           await _supabase.from('cw_ticket_items').insert(itemsToInsert);
-          final additionalAmount = snacks.fold<double>(0, (prev, s) {
-             final t = s['item']['price_auto'] ?? s['item']['price'] ?? 0.0;
-             return prev + (t is num ? t.toDouble() : double.tryParse(t.toString()) ?? 0.0) * s['qty'];
-          });
+          
           final firstTicket = vehicles.first['item'];
-          final newTotal = (firstTicket['total_amount'] ?? 0.0) + additionalAmount;
+          final newTotal = (firstTicket['total_amount'] ?? 0.0) + snacksTotal;
           await _supabase.from('cw_tickets').update({'total_amount': newTotal}).eq('id', billingTicketId);
         }
+      }
+
+      // 3. Si es Vale, registrar en el Ledger
+      if (method == 'vale' && workerId != null) {
+        String description = "Compra Tienda: ";
+        description += snacks.map((s) => "${s['qty']}x ${s['item']['name']}").join(", ");
+        if (vehicles.isNotEmpty) {
+          description += " + Lavado ${vehicles.first['item']['vehicle_plate']}";
+        }
+
+        await _supabase.from('cw_worker_ledger').insert({
+          'worker_id': workerId,
+          'amount': -totalAmount, // Monto negativo para el vale
+          'type': 'purchase',
+          'description': description,
+          'ticket_id': billingTicketId,
+        });
       }
 
       if (mounted) {
@@ -412,7 +568,7 @@ class _CajaViewState extends State<CajaView> {
           _cart.clear();
           _requiresInvoice = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Venta cobrada correctamente.'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Venta procesada con éxito.'), backgroundColor: Colors.green));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -423,125 +579,177 @@ class _CajaViewState extends State<CajaView> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 1100;
+
     return Column(
       children: [
-        AppBar(
-          title: const Text('Caja - Centro de Control / POS', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF1E3A8A),
-          elevation: 0,
-        ),
+        if (!isMobile)
+          AppBar(
+            title: const Text('Caja - Centro de Control / POS', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF1E3A8A),
+            elevation: 0,
+          ),
         Expanded(
           child: DefaultTabController(
             length: 2,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      children: [
-                        const TabBar(
-                          labelColor: Color(0xFF1E3A8A),
-                          unselectedLabelColor: Colors.grey,
-                          indicatorColor: Color(0xFF1E3A8A),
-                          tabs: [
-                            Tab(text: 'Autos en Curso', icon: Icon(Icons.directions_car)),
-                            Tab(text: 'La Tiendita', icon: Icon(Icons.fastfood)),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: TabBarView(
-                            children: [
-                              _buildVehiclesTab(),
-                              _buildSnacksTab(),
-                            ],
-                          ),
-                        ),
+            child: isMobile 
+              ? Column(
+                  children: [
+                    const TabBar(
+                      labelColor: Color(0xFF1E3A8A),
+                      unselectedLabelColor: Colors.grey,
+                      indicatorColor: Color(0xFF1E3A8A),
+                      tabs: [
+                        Tab(text: 'Autos', icon: Icon(Icons.directions_car)),
+                        Tab(text: 'Tienda', icon: Icon(Icons.fastfood)),
                       ],
                     ),
-                  ),
-                ),
-                Container(
-                  width: 380,
-                  color: Colors.white,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(24),
-                        color: const Color(0xFF1E3A8A),
-                        child: const Text('PUNTO DE VENTA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2)),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          _buildVehiclesTab(),
+                          _buildSnacksTab(),
+                        ],
                       ),
-                      Expanded(
-                        child: _cart.isEmpty 
-                          ? const Center(child: Text('Carrito vacío', style: TextStyle(color: Colors.grey)))
-                          : ListView.builder(
-                              itemCount: _cart.length,
-                              itemBuilder: (context, i) {
-                                final c = _cart[i];
-                                final isVehicle = c['type'] == 'vehicle';
-                                final item = c['item'];
-                                final title = isVehicle ? '${item['vehicle_plate']} (${item['vehicle_model']})' : item['name'];
-                                return ListTile(
-                                  leading: Icon(isVehicle ? Icons.directions_car : Icons.fastfood, color: Colors.indigo, size: 28),
-                                  title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(isVehicle ? 'Lavado de Auto' : 'Cantidad: ${c['qty']}'),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () => _removeFromCart(i),
-                                  ),
-                                );
-                              },
-                            ),
-                      ),
-                      const Divider(height: 1),
-                      Container(
-                        padding: const EdgeInsets.all(24),
+                    ),
+                    Container(
+                      height: 200,
+                      color: Colors.white,
+                      child: _buildCartSection(isMobile: true),
+                    ),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        padding: const EdgeInsets.all(32),
                         child: Column(
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('SUBTOTAL', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                                Text('\$${_calculateTotal().toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                            const TabBar(
+                              labelColor: Color(0xFF1E3A8A),
+                              unselectedLabelColor: Colors.grey,
+                              indicatorColor: Color(0xFF1E3A8A),
+                              tabs: [
+                                Tab(text: 'Autos en Curso', icon: Icon(Icons.directions_car)),
+                                Tab(text: 'La Tiendita', icon: Icon(Icons.fastfood)),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            SwitchListTile(
-                              title: const Text('Requiere Factura', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                              value: _requiresInvoice,
-                              onChanged: (val) => setState(() => _requiresInvoice = val),
-                              contentPadding: EdgeInsets.zero,
-                              activeColor: Colors.indigo,
-                            ),
                             const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 60,
-                              child: ElevatedButton(
-                                onPressed: _isProcessing ? null : _processCart,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFE53935),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: _isProcessing 
-                                  ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text('COBRAR AHORA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                            Expanded(
+                              child: TabBarView(
+                                children: [
+                                  _buildVehiclesTab(),
+                                  _buildSnacksTab(),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    Container(
+                      width: 380,
+                      color: Colors.white,
+                      child: _buildCartSection(isMobile: false),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCartSection({required bool isMobile}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(isMobile ? 12 : 24),
+          color: const Color(0xFF1E3A8A),
+          child: Text(
+            'PUNTO DE VENTA', 
+            style: TextStyle(
+              fontSize: isMobile ? 14 : 18, 
+              fontWeight: FontWeight.bold, 
+              color: Colors.white, 
+              letterSpacing: 1.2
+            )
+          ),
+        ),
+        Expanded(
+          child: _cart.isEmpty 
+            ? const Center(child: Text('Carrito vacío', style: TextStyle(color: Colors.grey)))
+            : ListView.builder(
+                itemCount: _cart.length,
+                itemBuilder: (context, i) {
+                  final c = _cart[i];
+                  final isVehicle = c['type'] == 'vehicle';
+                  final item = c['item'];
+                  final title = isVehicle ? '${item['vehicle_plate']} (${item['vehicle_model']})' : item['name'];
+                  return ListTile(
+                    dense: isMobile,
+                    leading: Icon(isVehicle ? Icons.directions_car : Icons.fastfood, color: Colors.indigo, size: isMobile ? 20 : 28),
+                    title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 13 : 15)),
+                    subtitle: Text(isVehicle ? 'Lavado de Auto' : 'Cantidad: ${c['qty']}', style: TextStyle(fontSize: isMobile ? 11 : 13)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                      onPressed: () => _removeFromCart(i),
+                    ),
+                  );
+                },
+              ),
+        ),
+        const Divider(height: 1),
+        Container(
+          padding: EdgeInsets.all(isMobile ? 12 : 24),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('SUBTOTAL', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                  Text('\$${_calculateTotal().toStringAsFixed(2)}', style: TextStyle(fontSize: isMobile ? 16 : 18, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              if (!isMobile) const SizedBox(height: 8),
+              if (!isMobile)
+                SwitchListTile(
+                  title: const Text('Requiere Factura', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  value: _requiresInvoice,
+                  onChanged: (val) => setState(() => _requiresInvoice = val),
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: Colors.indigo,
+                ),
+              SizedBox(height: isMobile ? 8 : 16),
+              SizedBox(
+                width: double.infinity,
+                height: isMobile ? 45 : 60,
+                child: ElevatedButton(
+                  onPressed: _isProcessing ? null : _processCart,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE53935),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _isProcessing 
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(
+                        'COBRAR AHORA', 
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 18, 
+                          fontWeight: FontWeight.bold, 
+                          color: Colors.white
+                        )
+                      ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -566,21 +774,31 @@ class _CajaViewState extends State<CajaView> {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.grey.shade200),
+                side: BorderSide(color: isInCart ? Colors.indigo : Colors.grey.shade200, width: isInCart ? 2 : 1),
               ),
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: (isInCart ? Colors.indigo : Colors.blue).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.drive_eta, color: Colors.blueAccent),
+                  child: Icon(Icons.drive_eta, color: isInCart ? Colors.indigo : Colors.blueAccent),
                 ),
-                title: Text(
-                  '${t['vehicle_plate']} - ${t['vehicle_model']}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${t['vehicle_plate']} - ${t['vehicle_model']}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 20, color: Colors.blueGrey),
+                      onPressed: () => _showEditVehicleDialog(t),
+                    ),
+                  ],
                 ),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -601,7 +819,6 @@ class _CajaViewState extends State<CajaView> {
                   ),
                 ),
                 onTap: isInCart ? null : () => _addToCart('vehicle', t),
-                enabled: !isInCart,
               ),
             );
           },
@@ -612,28 +829,122 @@ class _CajaViewState extends State<CajaView> {
 
   Widget _buildSnacksTab() {
     if (_snacks.isEmpty) return const Center(child: Text('No hay productos registrados'));
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 1.2, crossAxisSpacing: 16, mainAxisSpacing: 16),
-      itemCount: _snacks.length,
-      itemBuilder: (context, i) {
-        final s = _snacks[i];
-        final price = (s['price_auto'] ?? s['price'] ?? 0.0);
-        return InkWell(
-          onTap: () => _addToCart('snack', s),
-          child: Container(
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey[200]!)),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.fastfood, color: Colors.orange, size: 32),
-                const SizedBox(height: 8),
-                Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                Text('\$$price', style: const TextStyle(color: Colors.orange)),
-              ],
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 700;
+
+    final filteredSnacks = _snacks.where((s) => s['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Buscar producto...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () {
+                setState(() {
+                  _searchQuery = "";
+                  _searchController.clear();
+                });
+              }) : null,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             ),
+            onChanged: (val) => setState(() => _searchQuery = val),
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: EdgeInsets.all(isMobile ? 8 : 16),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isMobile ? 3 : 4, 
+              childAspectRatio: isMobile ? 0.8 : 1.0, 
+              crossAxisSpacing: isMobile ? 8 : 16, 
+              mainAxisSpacing: isMobile ? 8 : 16
+            ),
+            itemCount: filteredSnacks.length,
+            itemBuilder: (context, i) {
+              final s = filteredSnacks[i];
+              final p = s['price_auto'] ?? s['price'] ?? 0.0;
+              final price = p is num ? p.toDouble() : double.tryParse(p.toString()) ?? 0.0;
+              return InkWell(
+                onTap: () => _addToCart('snack', s),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white, 
+                    borderRadius: BorderRadius.circular(16), 
+                    border: Border.all(color: Colors.grey[200]!),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2))],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), shape: BoxShape.circle),
+                        child: Icon(Icons.fastfood, color: Colors.orange, size: isMobile ? 24 : 32),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          s['name'], 
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 11 : 13), 
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('\$${price.toStringAsFixed(0)}', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: isMobile ? 12 : 14)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showEditVehicleDialog(Map<String, dynamic> ticket) {
+    final plateCtrl = TextEditingController(text: ticket['vehicle_plate']);
+    final modelCtrl = TextEditingController(text: ticket['vehicle_model']);
+    final colorCtrl = TextEditingController(text: ticket['vehicle_color']);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar Vehículo'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: plateCtrl, decoration: const InputDecoration(labelText: 'Placas')),
+            const SizedBox(height: 8),
+            TextField(controller: modelCtrl, decoration: const InputDecoration(labelText: 'Modelo / Marca')),
+            const SizedBox(height: 8),
+            TextField(controller: colorCtrl, decoration: const InputDecoration(labelText: 'Color')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () async {
+              await _supabase.from('cw_tickets').update({
+                'vehicle_plate': plateCtrl.text.toUpperCase(),
+                'vehicle_model': modelCtrl.text,
+                'vehicle_color': colorCtrl.text,
+              }).eq('id', ticket['id']);
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Guardar Cambios'),
+          ),
+        ],
+      ),
     );
   }
 }

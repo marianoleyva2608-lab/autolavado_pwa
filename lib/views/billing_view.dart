@@ -118,12 +118,15 @@ class _BillingViewState extends State<BillingView> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 900;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text(
-          'Facturación (CFDI 4.0)',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          isMobile ? 'Facturación' : 'Facturación (CFDI 4.0)',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
@@ -132,412 +135,336 @@ class _BillingViewState extends State<BillingView> {
           TextButton.icon(
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.close, color: Colors.red),
-            label: const Text(
-              'SALIR',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            label: Text(
+              isMobile ? 'SAL' : 'SALIR',
+              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
         ],
       ),
-      body: Row(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Column(
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(isMobile ? 16 : 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flex(
+              direction: isMobile ? Axis.vertical : Axis.horizontal,
+              crossAxisAlignment: isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Generar Comprobante',
+                      style: TextStyle(
+                        fontSize: isMobile ? 22 : 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Folio: ${_selectedTicket?['id']?.substring(0, 8) ?? 'Nueva'}',
+                      style: TextStyle(
+                        fontSize: isMobile ? 14 : 18,
+                        color: Colors.blueGrey,
+                      ),
+                    ),
+                  ],
+                ),
+                if (isMobile) const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.blue),
+                  ),
+                  child: const Text(
+                    'CFDI 4.0',
+                    style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 32),
+
+            // Customer & Regime Section
+            if (isMobile) ...[
+              _label('CLIENTE RECEPTOR'),
+              _dropdown(
+                _selectedClient,
+                [
+                  const DropdownMenuItem(
+                    value: 'PUBLICO EN GENERAL',
+                    child: Text('PÚBLICO GENERAL', style: TextStyle(fontSize: 12)),
+                  ),
+                  ..._realClients.map(
+                    (c) => DropdownMenuItem(
+                      value: c['name'],
+                      child: Text("${c['name']}", style: const TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                ],
+                (val) => _onClientChanged(val),
+              ),
+              const SizedBox(height: 16),
+              _label('RÉGIMEN FISCAL'),
+              _dropdown(
+                _selectedRegimen,
+                _currentRegimenes.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 10)))).toList(),
+                null,
+              ),
+            ] else
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Generar Comprobante Fiscal',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'Folio Venta: ${_selectedTicket?['id']?.substring(0, 8) ?? 'Nueva'}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              color: Colors.blueGrey,
-                            ),
-                          ),
-                          Text(
-                            'Fecha: ${_selectedTicket?['created_at'] != null ? DateTime.parse(_selectedTicket!['created_at']).toLocal().toString().split('.')[0] : 'Hoy'}',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.blue),
-                        ),
-                        child: const Text(
-                          'CFDI 4.0 - ACTIVO',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Customer & Regime Section
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('CLIENTE RECEPTOR'),
-                            _dropdown(
-                              _selectedClient,
-                              [
-                                const DropdownMenuItem(
-                                  value: 'PUBLICO EN GENERAL',
-                                  child: Text(
-                                    'PUBLICO EN GENERAL (XAXX010101000)',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                ),
-                                ..._realClients.map(
-                                  (c) => DropdownMenuItem(
-                                    value: c['name'],
-                                    child: Text(
-                                      "${c['name']} (${c['rfc']})",
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              (val) {
-                                setState(() {
-                                  _selectedClient = val!;
-                                  if (val == 'PUBLICO EN GENERAL') {
-                                    _currentRFC = 'XAXX010101000';
-                                    _selectedPersonType = "FÍSICA";
-                                    _selectedRegimen = '616';
-                                    _selectedUsoCFDI = 'S01';
-                                  } else {
-                                    final client = _realClients.firstWhere(
-                                      (c) => c['name'] == val,
-                                    );
-                                    _currentRFC = client['rfc'] ?? 'S/N';
-                                    _selectedPersonType =
-                                        client['person_type'] ??
-                                        (client['rfc']?.length == 12
-                                            ? 'MORAL'
-                                            : 'FÍSICA');
-                                    _selectedRegimen =
-                                        client['regimen_code'] ??
-                                        (_selectedPersonType == 'FÍSICA'
-                                            ? '612'
-                                            : '601');
-                                    _selectedUsoCFDI =
-                                        client['uso_cfdi_default'] ?? 'G03';
-                                  }
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('RÉGIMEN FISCAL'),
-                            _dropdown(
-                              _selectedRegimen,
-                              _currentRegimenes.entries
-                                  .map(
-                                    (e) => DropdownMenuItem(
-                                      value: e.key,
-                                      child: Text(
-                                        e.value,
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              null,
-                            ), // Read-only once set in client
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Payment Info Section
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('MÉTODO DE PAGO'),
-                            _dropdown(
-                              _selectedMetodoPago,
-                              _metodosPago.entries
-                                  .map(
-                                    (e) => DropdownMenuItem(
-                                      value: e.key,
-                                      child: Text(
-                                        e.value,
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              (val) =>
-                                  setState(() => _selectedMetodoPago = val!),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('USO DE CFDI'),
-                            _dropdown(
-                              _selectedUsoCFDI,
-                              _usosCFDI.entries
-                                  .map(
-                                    (e) => DropdownMenuItem(
-                                      value: e.key,
-                                      child: Text(
-                                        e.value,
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              (val) => setState(() => _selectedUsoCFDI = val!),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('FORMA DE PAGO'),
-                            _dropdown(
-                              _selectedFormaPago,
-                              _formasPago.entries
-                                  .map(
-                                    (e) => DropdownMenuItem(
-                                      value: e.key,
-                                      child: Text(
-                                        e.value,
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              (val) =>
-                                  setState(() => _selectedFormaPago = val!),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 48),
-
-                  // Items Table
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                        ),
-                      ],
-                    ),
+                  Expanded(
+                    flex: 2,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(12),
+                        _label('CLIENTE RECEPTOR'),
+                        _dropdown(
+                          _selectedClient,
+                          [
+                            const DropdownMenuItem(
+                              value: 'PUBLICO EN GENERAL',
+                              child: Text('PUBLICO EN GENERAL (XAXX010101000)', style: TextStyle(fontSize: 13)),
                             ),
-                          ),
-                          child: Row(
-                            children: const [
-                              Expanded(
-                                flex: 1,
-                                child: Text(
-                                  'CLAVE SAT',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 4,
-                                child: Text(
-                                  'DESCRIPCIÓN DEL SERVICIO',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 1,
-                                child: Text(
-                                  'PRECIO U.',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 1,
-                                child: Text(
-                                  'CANT.',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 1,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'TOTAL',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Item Row using Ticket Data
-                        _tableRow(
-                          '71111505',
-                          'SERVICIO DE LAVADO DE VEHÍCULO',
-                          (_selectedTicket?['total_amount'] ?? 0.0) / 1.16,
-                          1,
-                          (_selectedTicket?['total_amount'] ?? 0.0).toDouble(),
-                        ),
-
-                        // Footer Totals
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.blueGrey[50],
-                            borderRadius: const BorderRadius.vertical(
-                              bottom: Radius.circular(12),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  _totalLine(
-                                    'Subtotal:',
-                                    (_selectedTicket?['total_amount'] ?? 0.0) /
-                                        1.16,
-                                  ),
-                                  _totalLine(
-                                    'IVA Trasladado (16%):',
-                                    (_selectedTicket?['total_amount'] ?? 0.0) -
-                                        ((_selectedTicket?['total_amount'] ??
-                                                0.0) /
-                                            1.16),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _totalLine(
-                                    'IMPORTE TOTAL:',
-                                    (_selectedTicket?['total_amount'] ?? 0.0)
-                                        .toDouble(),
-                                    isBold: true,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ..._realClients.map((c) => DropdownMenuItem(value: c['name'], child: Text("${c['name']} (${c['rfc']})", style: const TextStyle(fontSize: 13)))),
+                          ],
+                          (val) => _onClientChanged(val),
                         ),
                       ],
                     ),
                   ),
-
-                  const SizedBox(height: 40),
-
-                  // Action Buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 48,
-                            vertical: 24,
-                          ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _label('RÉGIMEN FISCAL'),
+                        _dropdown(
+                          _selectedRegimen,
+                          _currentRegimenes.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 11)))).toList(),
+                          null,
                         ),
-                        child: const Text(
-                          'CANCELAR',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        onPressed: _timbrarFactura,
-                        icon: const Icon(Icons.receipt_long, size: 20),
-                        label: const Text('TIMBRAR E IMPRIMIR CFDI 4.0'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.indigo[900],
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 24,
-                          ),
-                          elevation: 4,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
+
+            const SizedBox(height: 24),
+
+            // Payment Info Section
+            Flex(
+              direction: isMobile ? Axis.vertical : Axis.horizontal,
+              children: [
+                Expanded(
+                  flex: isMobile ? 0 : 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _label('MÉTODO'),
+                      _dropdown(
+                        _selectedMetodoPago,
+                        _metodosPago.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 11)))).toList(),
+                        (val) => setState(() => _selectedMetodoPago = val!),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isMobile) const SizedBox(height: 16) else const SizedBox(width: 16),
+                Expanded(
+                  flex: isMobile ? 0 : 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _label('USO CFDI'),
+                      _dropdown(
+                        _selectedUsoCFDI,
+                        _usosCFDI.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 11)))).toList(),
+                        (val) => setState(() => _selectedUsoCFDI = val!),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isMobile) const SizedBox(height: 16) else const SizedBox(width: 16),
+                Expanded(
+                  flex: isMobile ? 0 : 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _label('FORMA PAGO'),
+                      _dropdown(
+                        _selectedFormaPago,
+                        _formasPago.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 11)))).toList(),
+                        (val) => setState(() => _selectedFormaPago = val!),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 32),
+
+            // Items Section
+            _buildItemsSection(isMobile),
+
+            const SizedBox(height: 40),
+
+            // Action Buttons
+            Flex(
+              direction: isMobile ? Axis.vertical : Axis.horizontal,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (!isMobile)
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
+                    child: const Text('CANCELAR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                  ),
+                if (!isMobile) const SizedBox(width: 16),
+                SizedBox(
+                  width: isMobile ? double.infinity : null,
+                  child: ElevatedButton.icon(
+                    onPressed: _timbrarFactura,
+                    icon: const Icon(Icons.receipt_long, size: 20),
+                    label: const Text('TIMBRAR E IMPRIMIR'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo[900],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                if (isMobile) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      child: const Text('CANCELAR'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onClientChanged(String? val) {
+    setState(() {
+      _selectedClient = val!;
+      if (val == 'PUBLICO EN GENERAL') {
+        _currentRFC = 'XAXX010101000';
+        _selectedPersonType = "FÍSICA";
+        _selectedRegimen = '616';
+        _selectedUsoCFDI = 'S01';
+      } else {
+        final client = _realClients.firstWhere((c) => c['name'] == val);
+        _currentRFC = client['rfc'] ?? 'S/N';
+        _selectedPersonType = client['person_type'] ?? (client['rfc']?.length == 12 ? 'MORAL' : 'FÍSICA');
+        _selectedRegimen = client['regimen_code'] ?? (_selectedPersonType == 'FÍSICA' ? '612' : '601');
+        _selectedUsoCFDI = client['uso_cfdi_default'] ?? 'G03';
+      }
+    });
+  }
+
+  Widget _buildItemsSection(bool isMobile) {
+    final subtotal = (_selectedTicket?['total_amount'] ?? 0.0) / 1.16;
+    final total = (_selectedTicket?['total_amount'] ?? 0.0).toDouble();
+    final iva = total - subtotal;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+      ),
+      child: Column(
+        children: [
+          if (!isMobile)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              color: Colors.grey[50],
+              child: Row(
+                children: const [
+                  Expanded(flex: 1, child: Text('CLAVE SAT', style: TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(flex: 4, child: Text('DESCRIPCIÓN', style: TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(flex: 1, child: Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue), textAlign: TextAlign.right)),
+                ],
+              ),
+            ),
+          
+          Padding(
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
+            child: Column(
+              children: [
+                if (isMobile) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('71111505', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text('\$${total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('SERVICIO DE LAVADO DE VEHÍCULO', style: TextStyle(fontWeight: FontWeight.bold)),
+                ] else
+                  _tableRow('71111505', 'SERVICIO DE LAVADO DE VEHÍCULO', total),
+              ],
             ),
           ),
+
+          const Divider(height: 1),
+
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(color: Colors.blueGrey[50], borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12))),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _totalLine('Subtotal:', subtotal, isMobile: isMobile),
+                _totalLine('IVA (16%):', iva, isMobile: isMobile),
+                const SizedBox(height: 8),
+                _totalLine('TOTAL:', total, isBold: true, isMobile: isMobile),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tableRow(String sku, String desc, double total) {
+    return Row(
+      children: [
+        Expanded(flex: 1, child: Text(sku)),
+        Expanded(flex: 4, child: Text(desc, style: const TextStyle(fontWeight: FontWeight.bold))),
+        Expanded(flex: 1, child: Text('\$${total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue), textAlign: TextAlign.right)),
+      ],
+    );
+  }
+
+  Widget _totalLine(String label, double amount, {bool isBold = false, bool isMobile = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: TextStyle(fontSize: isMobile ? 12 : 14, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          const SizedBox(width: 8),
+          Text('\$${amount.toStringAsFixed(2)}', style: TextStyle(fontSize: isMobile ? 13 : 16, fontWeight: isBold ? FontWeight.bold : FontWeight.bold, color: isBold ? Colors.indigo : Colors.black87)),
         ],
       ),
     );
@@ -863,99 +790,6 @@ class _BillingViewState extends State<BillingView> {
     );
   }
 
-  Widget _tableRow(
-    String code,
-    String name,
-    double price,
-    int qty,
-    double total,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: Text(
-              code,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.blueGrey,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 4,
-            child: Text(
-              name,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text(
-              '\$${price.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text(qty.toString(), style: const TextStyle(fontSize: 14)),
-          ),
-          Expanded(
-            flex: 1,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  '\$${total.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF1E3A8A),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _totalLine(String label, double amount, {bool isBold = false}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isBold ? 20 : 15,
-            fontWeight: isBold ? FontWeight.w900 : FontWeight.w500,
-            color: isBold ? const Color(0xFF0F172A) : const Color(0xFF64748B),
-          ),
-        ),
-        const SizedBox(width: 32),
-        SizedBox(
-          width: 140,
-          child: Text(
-            '\$${amount.toStringAsFixed(2)}',
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: isBold ? 22 : 15,
-              fontWeight: isBold ? FontWeight.w900 : FontWeight.w700,
-              color: isBold ? const Color(0xFF1E3A8A) : const Color(0xFF1E293B),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   /// Motor de Generación de JSON para CFDI 4.0
   Map<String, dynamic> _generateInvoiceJSON() {
