@@ -12,6 +12,9 @@ class _ClientsViewState extends State<ClientsView> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
   List<Map<String, dynamic>> _clients = [];
+  bool _loadingVehicles = false;
+  List<Map<String, dynamic>> _clientVehicles = [];
+  void Function(void Function())? _currentSetDialogState;
   String _searchQuery = "";
 
   final _nameController = TextEditingController();
@@ -23,8 +26,6 @@ class _ClientsViewState extends State<ClientsView> {
   String _selectedClientType = "FACTURA";
   bool _hasCredit = false;
   final _creditLimitController = TextEditingController();
-  List<Map<String, dynamic>> _clientVehicles = []; // Vehículos del cliente siendo editado
-  bool _loadingVehicles = false;
 
   final Map<String, String> _regimenesFisica = {
     "605": "605 - Sueldos y salarios",
@@ -92,6 +93,39 @@ class _ClientsViewState extends State<ClientsView> {
     }
   }
 
+  Future<void> _fetchClientVehicles(String clientName) async {
+    try {
+      final res = await _supabase
+          .from('cw_tickets')
+          .select('vehicle_plate, vehicle_type, vehicle_model, vehicle_color')
+          .eq('customer_name', clientName);
+      
+      final uniqueVehicles = <String, Map<String, dynamic>>{};
+      for (var row in res) {
+        final plate = row['vehicle_plate']?.toString().toUpperCase().trim() ?? '';
+        if (plate.isNotEmpty) {
+          uniqueVehicles[plate] = row;
+        }
+      }
+
+      if (mounted) {
+        _clientVehicles = uniqueVehicles.values.toList();
+        _loadingVehicles = false;
+        if (_currentSetDialogState != null) {
+          _currentSetDialogState!(() {});
+        }
+      }
+    } catch (e) {
+      print('Error fetching vehicles: $e');
+      if (mounted) {
+        _loadingVehicles = false;
+        if (_currentSetDialogState != null) {
+          _currentSetDialogState!(() {});
+        }
+      }
+    }
+  }
+
   Future<void> _addOrEditClient({Map<String, dynamic>? client}) async {
     if (client != null) {
       _nameController.text = client['name'] ?? '';
@@ -127,7 +161,9 @@ class _ClientsViewState extends State<ClientsView> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) {
+        _currentSetDialogState = setDialogState;
+        return AlertDialog(
           title: Text(client == null ? 'Nuevo Cliente' : 'Editar Cliente'),
           content: SingleChildScrollView(
             child: Column(
@@ -367,38 +403,10 @@ class _ClientsViewState extends State<ClientsView> {
               child: const Text('GUARDAR'),
             ),
           ],
-        ),
-      ),
+        );
+      },
+     ),
     );
-  }
-
-  Future<void> _fetchClientVehicles(String clientName) async {
-    try {
-      final res = await _supabase
-          .from('cw_tickets')
-          .select('vehicle_plate, vehicle_model, vehicle_color, vehicle_type')
-          .eq('customer_name', clientName);
-      
-      final List<Map<String, dynamic>> all = List<Map<String, dynamic>>.from(res);
-      // Quedarnos con el último registro de cada placa
-      final Map<String, Map<String, dynamic>> unique = {};
-      for (var v in all) {
-        final plate = v['vehicle_plate']?.toString().toUpperCase().trim() ?? '';
-        if (plate.isNotEmpty) {
-          unique[plate] = Map<String, dynamic>.from(v);
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _clientVehicles = unique.values.toList();
-          _loadingVehicles = false;
-        });
-      }
-    } catch (e) {
-      print('Error en _fetchClientVehicles: $e');
-      if (mounted) setState(() => _loadingVehicles = false);
-    }
   }
 
   Widget _buildBadge(String text, Color color) {
