@@ -275,15 +275,15 @@ class _ReceptionViewState extends State<ReceptionView> {
         title: const Text('Seleccionar Color'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: SizedBox(
-          width: 500, // Aumentar ancho para ver más opciones
-          height: 400, // Altura fija para scroll
+          width: 600, 
+          height: 350, 
           child: GridView.builder(
             shrinkWrap: true,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4, // 4 columnas para 24+ colores
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: 0.85,
+              crossAxisCount: 6, // 6 columnas para íconos más chicos
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 0.9,
             ),
             itemCount: _carColors.length,
             itemBuilder: (context, i) {
@@ -311,11 +311,13 @@ class _ReceptionViewState extends State<ReceptionView> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       entry.key,
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
