@@ -352,8 +352,11 @@ class _ReceptionViewState extends State<ReceptionView> {
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
-        : Center(
-            child: SingleChildScrollView(
+        : Builder(
+            builder: (context) {
+              final isMobile = MediaQuery.of(context).size.width < 600;
+              return Center(
+                child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 600),
@@ -370,22 +373,32 @@ class _ReceptionViewState extends State<ReceptionView> {
                     children: [
                       const Text('Datos del Cliente y Vehículo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
                       const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildAutocompleteField(
-                              'Nombre del Cliente', 
-                              Icons.person, 
-                              _customerNameController,
-                              'customer_name'
+                      if (isMobile) ...[
+                        _buildAutocompleteField(
+                          'Nombre del Cliente', 
+                          Icons.person, 
+                          _customerNameController,
+                          'customer_name'
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField('Teléfono', Icons.phone, _customerPhoneController, isPhone: true),
+                      ] else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildAutocompleteField(
+                                'Nombre del Cliente', 
+                                Icons.person, 
+                                _customerNameController,
+                                'customer_name'
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildTextField('Teléfono', Icons.phone, _customerPhoneController, isPhone: true),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField('Teléfono', Icons.phone, _customerPhoneController, isPhone: true),
+                            ),
+                          ],
+                        ),
                       const SizedBox(height: 16),
                       _buildAutocompleteField(
                         'Placas', 
@@ -395,17 +408,22 @@ class _ReceptionViewState extends State<ReceptionView> {
                         onSelected: (val) => _plateController.text = val.toUpperCase(),
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField('Modelo / Marca', Icons.directions_car, _modelController),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildTextField('Color', Icons.palette, _colorController, readOnly: true, onTap: _showColorPicker),
-                          ),
-                        ],
-                      ),
+                      if (isMobile) ...[
+                        _buildTextField('Modelo / Marca', Icons.directions_car, _modelController),
+                        const SizedBox(height: 16),
+                        _buildTextField('Color', Icons.palette, _colorController, readOnly: true, onTap: _showColorPicker),
+                      ] else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField('Modelo / Marca', Icons.directions_car, _modelController),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField('Color', Icons.palette, _colorController, readOnly: true, onTap: _showColorPicker),
+                            ),
+                          ],
+                        ),
                       const SizedBox(height: 32),
                       const Text('Tipo de Auto y Servicio', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
                       const SizedBox(height: 20),
@@ -460,51 +478,20 @@ class _ReceptionViewState extends State<ReceptionView> {
                       
                       const SizedBox(height: 24),
                       // Precio y Comisión (si es especial)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Precio Final (Ajustable)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: _priceController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: InputDecoration(
-                                    prefixText: '\$ ',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                                    filled: true,
-                                    fillColor: Colors.green.withOpacity(0.1),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (_selectedService?['name'] == 'SERVICIO ESPECIAL') ...[
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Comisión Lavador', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange)),
-                                  const SizedBox(height: 8),
-                                  TextField(
-                                    controller: _commissionController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: InputDecoration(
-                                      prefixText: '\$ ',
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                                      filled: true,
-                                      fillColor: Colors.orange.withOpacity(0.1),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                      if (isMobile && _selectedService?['name'] == 'SERVICIO ESPECIAL') ...[
+                        _buildPriceField(),
+                        const SizedBox(height: 16),
+                        _buildCommissionField(),
+                      ] else
+                        Row(
+                          children: [
+                            Expanded(child: _buildPriceField()),
+                            if (_selectedService?['name'] == 'SERVICIO ESPECIAL') ...[
+                              const SizedBox(width: 16),
+                              Expanded(child: _buildCommissionField()),
+                            ],
                           ],
-                        ],
-                      ),
+                        ),
                       
                       const SizedBox(height: 32),
                       SizedBox(
@@ -526,8 +513,10 @@ class _ReceptionViewState extends State<ReceptionView> {
                     ],
                   ),
                 ),
-              ),
-            ),
+                  ),
+                ),
+              );
+            },
           ),
     );
   }
@@ -640,6 +629,46 @@ class _ReceptionViewState extends State<ReceptionView> {
           onFieldSubmitted: (v) => onFieldSubmitted(),
         );
       },
+    );
+  }
+
+  Widget _buildPriceField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Precio Final (Ajustable)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _priceController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            prefixText: '\$ ',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            filled: true,
+            fillColor: Colors.green.withValues(alpha: 0.1),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCommissionField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Comisión Lavador', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _commissionController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            prefixText: '\$ ',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            filled: true,
+            fillColor: Colors.orange.withValues(alpha: 0.1),
+          ),
+        ),
+      ],
     );
   }
 }

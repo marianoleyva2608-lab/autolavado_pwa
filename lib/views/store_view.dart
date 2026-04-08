@@ -188,6 +188,19 @@ class _StoreViewState extends State<StoreView> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    int columns = 2; // Mobile default
+    
+    if (width > 1400) {
+      columns = 6;
+    } else if (width > 1100) {
+      columns = 5;
+    } else if (width > 800) {
+      columns = 4;
+    } else if (width > 550) {
+      columns = 3;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tiendita / Snacks'),
@@ -202,9 +215,9 @@ class _StoreViewState extends State<StoreView> {
               Expanded(
                 child: GridView.builder(
                   padding: const EdgeInsets.all(12),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5,
-                    childAspectRatio: 0.85,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    childAspectRatio: 0.82,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                   ),

@@ -243,8 +243,11 @@ class _QueueViewState extends State<QueueView> {
       return const Center(child: Text('No hay autos en cola', style: TextStyle(fontSize: 18, color: Colors.black45)));
     }
 
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 750;
+
     return ListView.builder(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(isMobile ? 12 : 32),
       itemCount: tickets.length,
       itemBuilder: (context, index) {
         final t = tickets[index];
@@ -264,95 +267,131 @@ class _QueueViewState extends State<QueueView> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.black12)),
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  width: 12,
-                  height: 60,
-                  decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(6)),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: isMobile 
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(t['vehicle_plate'] ?? 'S/N', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      Text('${t['vehicle_model']} • ${t['vehicle_color']}', style: const TextStyle(color: Colors.black54)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                            child: Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.access_time, size: 14, color: Colors.blueGrey),
-                                const SizedBox(width: 4),
-                                Text(entryDateTime, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _ElapsedTimeDisplay(startTime: t['created_at']),
-                          if (t['worker_assigned_id'] != null) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(color: Colors.purple.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.person, size: 14, color: Colors.purple),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _workers.isEmpty ? '...' : _workers.firstWhere((w) => w['id'] == t['worker_assigned_id'], orElse: () => {'name': 'Cargando...'})['name'],
-                                    style: const TextStyle(color: Colors.purple, fontWeight: FontWeight.bold, fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
+                      Container(
+                        width: 8,
+                        height: 40,
+                        decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(4)),
                       ),
+                      const SizedBox(width: 12),
+                      Text(t['vehicle_plate'] ?? 'S/N', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     ],
                   ),
-                ),
-                const SizedBox(width: 32),
-                if (t['status'] == 'queue')
-                  ElevatedButton.icon(
-                    onPressed: () => _assignWorkerAndStart(t['id']),
-                    icon: const Icon(Icons.water_drop),
-                    label: const Text('EMPEZAR LAVADO'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  )
-                else if (t['status'] == 'washing')
-                  ElevatedButton.icon(
-                    onPressed: () => _updateStatus(t['id'], 'ready'),
-                    icon: const Icon(Icons.check_circle),
-                    label: const Text('MARCAR COMO LISTO'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  const SizedBox(height: 8),
+                  Text('${t['vehicle_model']} • ${t['vehicle_color']}', style: const TextStyle(color: Colors.black54)),
+                  const SizedBox(height: 12),
+                  _buildStatusAndStats(statusColor, statusLabel, entryDateTime, t),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _buildActionButton(t),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 60,
+                    decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(6)),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(t['vehicle_plate'] ?? 'S/N', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                        Text('${t['vehicle_model']} • ${t['vehicle_color']}', style: const TextStyle(color: Colors.black54)),
+                        const SizedBox(height: 8),
+                        _buildStatusAndStats(statusColor, statusLabel, entryDateTime, t),
+                      ],
                     ),
                   ),
-              ],
-            ),
+                  const SizedBox(width: 32),
+                  _buildActionButton(t),
+                ],
+              ),
           ),
         );
       },
     );
+  }
+
+  Widget _buildStatusAndStats(Color statusColor, String statusLabel, String entryDateTime, Map<String, dynamic> t) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+          child: Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.access_time, size: 14, color: Colors.blueGrey),
+              const SizedBox(width: 4),
+              Text(entryDateTime, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold, fontSize: 12)),
+            ],
+          ),
+        ),
+        _ElapsedTimeDisplay(startTime: t['created_at']),
+        if (t['worker_assigned_id'] != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: Colors.purple.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.person, size: 14, color: Colors.purple),
+                const SizedBox(width: 4),
+                Text(
+                  _workers.isEmpty ? '...' : _workers.firstWhere((w) => w['id'] == t['worker_assigned_id'], orElse: () => {'name': 'Cargando...'})['name'],
+                  style: const TextStyle(color: Colors.purple, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton(Map<String, dynamic> t) {
+    if (t['status'] == 'queue') {
+      return ElevatedButton.icon(
+        onPressed: () => _assignWorkerAndStart(t['id']),
+        icon: const Icon(Icons.water_drop),
+        label: const Text('EMPEZAR LAVADO'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } else if (t['status'] == 'washing') {
+      return ElevatedButton.icon(
+        onPressed: () => _updateStatus(t['id'], 'ready'),
+        icon: const Icon(Icons.check_circle),
+        label: const Text('MARCAR COMO LISTO'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 }
 

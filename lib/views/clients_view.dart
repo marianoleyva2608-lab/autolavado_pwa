@@ -574,14 +574,14 @@ class _ClientsViewState extends State<ClientsView> {
                      ),
                    ],
                    const SizedBox(height: 8),
-                   Row(
+                   Wrap(
+                     spacing: 4,
+                     runSpacing: 4,
                      children: [
                        _buildBadge(isNote ? 'NOTA' : 'FACTURA', isNote ? Colors.orange : Colors.blue),
                         if (c['has_credit'] == true) ...[
-                          const SizedBox(width: 8),
                           _buildBadge('CON CRÉDITO (\$${c['credit_limit']})', Colors.green),
                         ],
-                        const SizedBox(width: 8),
                         _buildBadge('${c['vehicle_count'] ?? 0} VEHÍCULOS', Colors.purple),
                       ],
                     ),
