@@ -456,7 +456,7 @@ class _ReceptionViewState extends State<ReceptionView> {
                       const SizedBox(height: 24),
                       DropdownButtonFormField<Map<String, dynamic>>(
                         isExpanded: true,
-                        value: _selectedService,
+                        initialValue: _selectedService,
                         decoration: InputDecoration(
                           labelText: 'Servicio / Paquete',
                           prefixIcon: const Icon(Icons.local_car_wash),

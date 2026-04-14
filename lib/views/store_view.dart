@@ -100,7 +100,7 @@ class _StoreViewState extends State<StoreView> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Seleccionar Lavador'),
-          content: Container(
+          content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
               shrinkWrap: true,

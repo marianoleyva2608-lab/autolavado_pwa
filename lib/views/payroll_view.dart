@@ -83,8 +83,9 @@ class _PayrollViewState extends State<PayrollView> {
 
             final vType = t['vehicle_type'] ?? 'AUTO';
             String commKey = 'comm_auto';
-            if (vType == 'SUV CH') commKey = 'comm_suv_ch';
-            else if (vType == 'SUV M') commKey = 'comm_suv_m';
+            if (vType == 'SUV CH') {
+              commKey = 'comm_suv_ch';
+            } else if (vType == 'SUV M') commKey = 'comm_suv_m';
             else if (vType == 'G') commKey = 'comm_g';
             else if (vType == 'XL') commKey = 'comm_xl';
 
@@ -128,8 +129,9 @@ class _PayrollViewState extends State<PayrollView> {
           }
 
           // Usamos valores absolutos para las variables de visualización
-          if (type == 'loan') totalLoans += amt.abs();
-          else if (type == 'tip') totalTips += amt.abs();
+          if (type == 'loan') {
+            totalLoans += amt.abs();
+          } else if (type == 'tip') totalTips += amt.abs();
           else if (type == 'purchase') totalStore += amt.abs();
           else if (type == 'bonus') totalBonus += amt.abs();
         }

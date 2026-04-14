@@ -12,50 +12,46 @@ class QueueView extends StatefulWidget {
 class _QueueViewState extends State<QueueView> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _workers = [];
-  
-  // Fallback Polling
+  List<Map<String, dynamic>> _tickets = [];
+  bool _isLoading = true;
+
+  // Realtime subscription + fallback polling
+  StreamSubscription<List<Map<String, dynamic>>>? _streamSub;
   Timer? _pollingTimer;
-  List<Map<String, dynamic>>? _latestTickets;
-  bool _usePolling = false;
 
   @override
   void initState() {
     super.initState();
-    print('QueueView initState: loading workers...');
     _loadWorkers();
-    _setupStream();
+    _setupRealtimeOrPolling();
   }
 
-  void _setupStream() {
-    // We'll use a listener to detect failures and switch to polling
-    _supabase
+  void _setupRealtimeOrPolling() {
+    _streamSub = _supabase
         .from('cw_tickets')
         .stream(primaryKey: ['id'])
         .inFilter('status', ['queue', 'washing'])
+        .order('created_at', ascending: true)
         .listen(
           (data) {
             if (mounted) {
               setState(() {
-                _latestTickets = data;
-                _usePolling = false;
+                _tickets = data;
+                _isLoading = false;
               });
             }
           },
           onError: (err) {
             print('Stream error, switching to polling: $err');
-            if (mounted) {
-              setState(() {
-                _usePolling = true;
-              });
-              _startPolling();
-            }
+            _streamSub?.cancel();
+            _streamSub = null;
+            _startPolling();
           },
         );
   }
 
   void _startPolling() {
-    _pollingTimer?.cancel();
-    _fetchTickets(); // Initial fetch
+    _fetchTickets();
     _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchTickets());
   }
 
@@ -66,10 +62,11 @@ class _QueueViewState extends State<QueueView> {
           .select()
           .filter('status', 'in', '("queue","washing")')
           .order('created_at', ascending: true);
-      
+
       if (mounted) {
         setState(() {
-          _latestTickets = List<Map<String, dynamic>>.from(res);
+          _tickets = List<Map<String, dynamic>>.from(res);
+          _isLoading = false;
         });
       }
     } catch (e) {
@@ -79,6 +76,7 @@ class _QueueViewState extends State<QueueView> {
 
   @override
   void dispose() {
+    _streamSub?.cancel();
     _pollingTimer?.cancel();
     super.dispose();
   }
@@ -161,12 +159,13 @@ class _QueueViewState extends State<QueueView> {
           'status': 'washing',
           'worker_assigned_id': selectedWorkerId,
         }).eq('id', ticketId);
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Lavado iniciado'), backgroundColor: Colors.blue),
           );
-          if (_usePolling) _fetchTickets();
+          // Si el stream falló y usamos polling, actualizar manualmente
+          if (_pollingTimer != null) _fetchTickets();
         }
       } catch (e) {
         if (mounted) {
@@ -189,7 +188,7 @@ class _QueueViewState extends State<QueueView> {
             duration: const Duration(seconds: 1),
           ),
         );
-        if (_usePolling) _fetchTickets();
+        if (_pollingTimer != null) _fetchTickets();
       }
     } catch (e) {
       if (mounted) {
@@ -210,35 +209,13 @@ class _QueueViewState extends State<QueueView> {
         foregroundColor: const Color(0xFF1E3A8A),
         elevation: 0,
       ),
-      body: _usePolling 
-        ? _buildTicketsList(_latestTickets)
-        : StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _supabase
-                .from('cw_tickets')
-                .stream(primaryKey: ['id'])
-                .inFilter('status', ['queue', 'washing'])
-                .order('created_at', ascending: true),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                // If stream fails, we switch flag to use polling instead
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted && !_usePolling) {
-                    setState(() => _usePolling = true);
-                    _startPolling();
-                  }
-                });
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snapshot.hasData && _latestTickets == null) return const Center(child: CircularProgressIndicator());
-              final tickets = snapshot.data ?? _latestTickets ?? [];
-              return _buildTicketsList(tickets);
-            },
-          ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _buildTicketsList(_tickets),
     );
   }
 
-  Widget _buildTicketsList(List<Map<String, dynamic>>? tickets) {
-    if (tickets == null) return const Center(child: CircularProgressIndicator());
+  Widget _buildTicketsList(List<Map<String, dynamic>> tickets) {
     if (tickets.isEmpty) {
       return const Center(child: Text('No hay autos en cola', style: TextStyle(fontSize: 18, color: Colors.black45)));
     }

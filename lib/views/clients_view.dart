@@ -170,7 +170,7 @@ class _ClientsViewState extends State<ClientsView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: _selectedClientType,
+                  initialValue: _selectedClientType,
                   decoration: const InputDecoration(
                     labelText: 'TIPO DE CLIENTE',
                     prefixIcon: Icon(Icons.category),
@@ -272,7 +272,7 @@ class _ClientsViewState extends State<ClientsView> {
                   subtitle: const Text('Permitir compras a cuenta'),
                   value: _hasCredit,
                   onChanged: (val) => setDialogState(() => _hasCredit = val),
-                  activeColor: Colors.blueAccent,
+                  activeThumbColor: Colors.blueAccent,
                 ),
                 if (_hasCredit)
                   TextField(
@@ -342,7 +342,7 @@ class _ClientsViewState extends State<ClientsView> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                 ],
               ],
             ),
